@@ -7,7 +7,7 @@ import copy
 import random 
 
 #Manually initialize state
-basis = 'STO-3G'
+basis = 'sto-3g'
 multiplicity = 1
 geometry = [('H', (0,0,1.5)),('H', (0, 0, 3)), ('H', (0,0,4.5)), ('H', (0, 0, 6)), ('H', (0, 0, 7.5)), ('H', (0, 0, 9))]
 geometry = [('H', (0,0,1.5)),('H', (0, 0, 3)), ('H', (0,0,4.5)), ('H', (0, 0, 6))]
@@ -89,7 +89,7 @@ v'=exp(a)exp(b)...exp(n)v
 def Trotter_SPE(parameters):
     global global_energy  
     new_state = reference_ket
-    for k in range(0, len(parameters)):
+    for k in reversed(range(0, len(parameters))):
         new_state = scipy.sparse.linalg.expm_multiply((parameters[k]*JW_CC_ops[k]), new_state)
     new_bra = new_state.transpose().conj()
     assert(new_bra.dot(new_state).toarray()[0][0]-1<0.0000001)
@@ -99,12 +99,15 @@ def Trotter_SPE(parameters):
     global_energy = global_energy.real
     return global_energy 
 
+
+                 
+                
 #Numerical trotterized gradient
 def Numerical_Trot_Grad(parameters):
     global global_der
     step_size = 1e-6
     grad = []
-    for k in range(0, len(parameters)):
+    for k in reversed(range(0, len(parameters))):
         para = copy.copy(parameters)
         para[k]+=step_size
         diff = Trotter_SPE(para)
@@ -114,12 +117,31 @@ def Numerical_Trot_Grad(parameters):
     global_der = np.asarray(grad)
     return np.asarray(grad)
 
+def Five_Point_Grad(parameters):
+    grad = []
+    for k in reversed(range(0, len(parameters))):
+        forw = copy.copy(parameters)
+        forw2 = copy.copy(parameters)
+        reve = copy.copy(parameters)
+        reve2 = copy.copy(parameters)
+        forw[k]+=1e-7
+        forw2[k]+=2e-7
+        reve[k]-=1e-7
+        reve2[k]-=2e-7
+        f2 = Trotter_SPE(forw2)
+        f1 = Trotter_SPE(forw)
+        r1 = Trotter_SPE(reve)
+        r2 = Trotter_SPE(reve2)
+        diff = (-f2+8*f1-8*r1+r2)/(1.2e-6)
+        grad.append(diff)
+    return np.asarray(grad)
+
 #Analytical trotter gradient
 def Trotter_Gradient(parameters):
     global global_der 
     grad = []
     new_state = copy.copy(reference_ket)
-    for k in range(0, len(parameters)):
+    for k in reversed(range(0, len(parameters))):
         new_state = scipy.sparse.linalg.expm_multiply((parameters[k]*JW_CC_ops[k]), new_state)
     new_bra = new_state.transpose().conj()
     hbra = new_bra.dot(hamiltonian)
@@ -134,25 +156,13 @@ def Trotter_Gradient(parameters):
 #Recursive component of analytical trotter gradient
 def Recurse(parameters, grad, hbra, ket, term):
     if term == 0:
-        #H_l = scipy.sparse.linalg.expm_multiply(-JW_CC_ops[0]*parameters[0], H_l)
         hbra = hbra
-        #bra = bra.dot(scipy.sparse.linalg.expm(JW_CC_ops[0]*parameters[0]))
         ket = ket
     else:
-        #H_l = scipy.sparse.linalg.expm_multiply(-JW_CC_ops[term]*parameters[term], H_l)
-        #H_r = H_r.dot(scipy.sparse.linalg.expm(JW_CC_ops[term-1]*parameters[term-1]))
         hbra = (scipy.sparse.linalg.expm_multiply(-JW_CC_ops[term-1]*parameters[term-1], hbra.transpose().conj())).transpose().conj()
-        #bra = bra.dot(scipy.sparse.linalg.expm(JW_CC_ops[term]*parameters[term]))
         ket = scipy.sparse.linalg.expm_multiply(-JW_CC_ops[term-1]*parameters[term-1], ket)
-    #term1 = full_bra.dot(H_r).dot(JW_CC_ops[term]).dot(ket)
-    #term2 = -bra.dot(JW_CC_ops[term]).dot(H_l).dot(full_ket)
-    #term1 = term1.toarray()[0][0].real
-
-    #term2 = term2.toarray()[0][0].real
-
-    #deriv = full_bra.dot(H_r).dot(JW_CC_ops[term]).dot(ket)
-    #grad.append(2*deriv.toarray()[0][0].real)
-    grad.append(2*hbra.dot(JW_CC_ops[term]).dot(ket).toarray()[0][0].real)
+    grad.append((2*hbra.dot(JW_CC_ops[term]).dot(ket).toarray()[0][0].real))
+    #grad.insert(0,(2*hbra.dot(JW_CC_ops[term]).dot(ket).toarray()[0][0].real))
     if term<len(parameters)-1:
         term += 1
         Recurse(parameters, grad, hbra, ket, term)
@@ -180,9 +190,4 @@ def callback(parameters):
 #print("\n Error: ")
 #print(np.linalg.norm(der_num-der_ana))
 
-#output = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Numerical_Trot_Grad, options = {'gtol': 1e-5, 'disp': True}, method = 'BFGS', callback=callback)
-#parameters = output['x']
-output = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-5, 'disp': True},
-        method = 'CG', callback=callback)
-#output = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-5, 'disp': True}, method =
-#        'L-BFGS-B', callback=callback)
+scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-7, 'disp': True}, method = 'BFGS', callback=callback)
