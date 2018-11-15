@@ -4,14 +4,28 @@ import openfermionpsi4
 import os
 import numpy as np
 import copy
+import random 
 
 #Manually initialize state
 basis = 'STO-3G'
 multiplicity = 1
 geometry = [('H', (0,0,1.5)),('H', (0, 0, 3)), ('H', (0,0,4.5)), ('H', (0, 0, 6)), ('H', (0, 0, 7.5)), ('H', (0, 0, 9))]
+geometry = [('H', (0,0,1.5)),('H', (0, 0, 3)), ('H', (0,0,4.5)), ('H', (0, 0, 6))]
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
-molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_ccsd = 1, run_fci=1)
+molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=1, run_cisd=1, run_ccsd = 1, run_fci=1, delete_input=0)
 n_spinorbitals = int(molecule.n_orbitals*2)
+print('HF energy      %20.16f au' %(molecule.hf_energy))
+print('MP2 energy     %20.16f au' %(molecule.mp2_energy))
+print('CISD energy    %20.16f au' %(molecule.cisd_energy))
+print('CCSD energy    %20.16f au' %(molecule.ccsd_energy))
+print('FCI energy     %20.16f au' %(molecule.fci_energy))
+
+global global_der 
+global global_energy  
+global global_iter  
+global_der = np.array([])
+global_energy = 0.0 
+global_iter = 0 
 
 #Build p-h reference and map it to JW transform
 reference_ket = scipy.sparse.csc_matrix(openfermion.jw_configuration_state(list(range(0,molecule.n_electrons)), molecule.n_qubits)).transpose()
@@ -49,6 +63,7 @@ for p in range(0, molecule.n_electrons):
         parameters.append(0)
         SQ_CC_ops.append(one_elec)
 
+print(" Number of parameters: ", len(parameters))
 #Jordan_Wigners into the Pauli Matrices, then computes their products as sparse matrices.
 JW_CC_ops = []
 for classical_op in SQ_CC_ops:
@@ -72,28 +87,36 @@ SPE based on full, 1st-order Trotter decomposition
 v'=exp(a)exp(b)...exp(n)v
 '''
 def Trotter_SPE(parameters):
+    global global_energy  
     new_state = reference_ket
     for k in range(0, len(parameters)):
         new_state = scipy.sparse.linalg.expm_multiply((parameters[k]*JW_CC_ops[k]), new_state)
     new_bra = new_state.transpose().conj()
     assert(new_bra.dot(new_state).toarray()[0][0]-1<0.0000001)
     energy = new_bra.dot(hamiltonian.dot(new_state))
-    return energy.toarray()[0][0].real
+    global_energy = energy.toarray()[0][0].real
+    assert(global_energy.imag <  1e-14)
+    global_energy = global_energy.real
+    return global_energy 
 
 #Numerical trotterized gradient
 def Numerical_Trot_Grad(parameters):
+    global global_der
+    step_size = 1e-6
     grad = []
     for k in range(0, len(parameters)):
         para = copy.copy(parameters)
-        para[k]+=.00000001
+        para[k]+=step_size
         diff = Trotter_SPE(para)
-        para[k]-=.00000002
+        para[k]-=2*step_size
         diff -= Trotter_SPE(para)
-        grad.append(diff/.00000002)
+        grad.append(diff/(step_size*2))
+    global_der = np.asarray(grad)
     return np.asarray(grad)
 
 #Analytical trotter gradient
 def Trotter_Gradient(parameters):
+    global global_der 
     grad = []
     new_state = copy.copy(reference_ket)
     for k in range(0, len(parameters)):
@@ -105,6 +128,7 @@ def Trotter_Gradient(parameters):
     term = 0
     ket = copy.copy(new_state)
     grad = Recurse(parameters, grad, hbra, ket, term)
+    global_der = grad
     return np.asarray(grad)
 
 #Recursive component of analytical trotter gradient
@@ -135,7 +159,30 @@ def Recurse(parameters, grad, hbra, ket, term):
     return np.asarray(grad)
 
 def callback(parameters):
-    print(Trotter_SPE(parameters))
+    global global_der 
+    global global_energy  
+    global global_iter 
+    err = np.sqrt(np.vdot(global_der, global_der))
+    print(" Iter:%4i Current Energy = %20.16f Gradient Norm %10.1e Gradient Max %10.1e" %(global_iter,
+        global_energy, err, np.max(np.abs(global_der))))
+    global_iter += 1
 
 
-scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-3, 'disp': True}, method = 'BFGS', callback=callback)
+#for p in range(len(parameters)):
+#    parameters[p] = (random.random()-.5)*.001
+
+#der_num = Numerical_Trot_Grad(parameters)
+#der_ana = Trotter_Gradient(parameters)
+#print(" Numerical: ")
+#print(der_num)
+#print("\n Analytical: ")
+#print(der_ana)
+#print("\n Error: ")
+#print(np.linalg.norm(der_num-der_ana))
+
+#output = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Numerical_Trot_Grad, options = {'gtol': 1e-5, 'disp': True}, method = 'BFGS', callback=callback)
+#parameters = output['x']
+output = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-5, 'disp': True},
+        method = 'CG', callback=callback)
+#output = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-5, 'disp': True}, method =
+#        'L-BFGS-B', callback=callback)
