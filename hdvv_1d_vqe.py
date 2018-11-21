@@ -5,7 +5,7 @@ import os
 import numpy as np
 import copy
 import random 
-
+import sys
 
 import hdvv
 import qubit
@@ -40,13 +40,13 @@ def get_neel(n_qubits):
     print(" Norm of neel state: ", scipy.sparse.linalg.norm(state))
     return state
 
-def fermionized_hf(sys, ham):
+def fermionized_hf(system, ham):
     print(" Do HF on spin lattice")
-    print(" Number of qubits = ", sys["n_qubits"])
-    lattice = QubitLattice(sys["n_qubits"])
+    print(" Number of qubits = ", system["n_qubits"])
+    lattice = QubitLattice(system["n_qubits"])
     print(lattice)
 
-    n_qubits = sys["n_qubits"]
+    n_qubits = system["n_qubits"]
     hamiltonian = []      #   list of operator strings
     ucc_generator = []      #   list of operator strings
 
@@ -61,7 +61,7 @@ def fermionized_hf(sys, ham):
             opstr.update_operator(ti[0],ti[1])
         hamiltonian.append(opstr)
 
-    J12 = sys["j12"]
+    J12 = system["j12"]
     if False:
         print(" This doesn't work because of the linear n terms in the transformed part")
         for i in range(n_qubits):
@@ -70,8 +70,13 @@ def fermionized_hf(sys, ham):
                 J12[j,i] = J12[i,j] 
 
     # Make isotropic
-    K12 = J12*1
-   
+    K12 = J12*2.0
+  
+    print(" J12 and K12:")
+    print(" J12: ")
+    print(J12)
+    print(" K12: ")
+    print(K12)
     do_hdvv_diag = 1
     if do_hdvv_diag:
         print(" Compute exact energies")
@@ -176,6 +181,12 @@ def fermionized_hf(sys, ham):
     print(" Energy of Determinant: %16.12f" %Ehf)
 
     molecular_hamiltonian = InteractionOperator(H.e_core, H.t, .5*H.V)
+
+#    for p in range(0,n_qubits):
+#        for q in range(p,n_qubits):
+#            for r in range(q,n_qubits):
+#                for s in range(r,n_qubits):
+#                    print(p,q,r,s,H.V[p,q,r,s])
 
     print(" Molecular Orbitals:")
     print("    ", end='')
@@ -287,7 +298,7 @@ if do_hdvv_diag:
 
 
 
-sys = {
+system = {
         "n_qubits" : n_sites,
         "n_alpha": 1,
         "n_beta": 1,
@@ -309,7 +320,7 @@ for hi in range(n_sites):
 
 
 #JW transform Hamiltonian computed classically with OFPsi4
-hamiltonian_op = fermionized_hf(sys, ham)
+hamiltonian_op = fermionized_hf(system, ham)
 hamiltonian = openfermion.transforms.get_sparse_operator(hamiltonian_op)
 
 global global_der 
@@ -319,10 +330,10 @@ global_der = np.array([])
 global_energy = 0.0 
 global_iter = 0 
 
-print(sys)
-n_qubits = sys['n_qubits']
-n_alpha  = sys['n_alpha']
-n_beta   = sys['n_beta']
+print(system)
+n_qubits = system['n_qubits']
+n_alpha  = system['n_alpha']
+n_beta   = system['n_beta']
 n_spinorbitals = n_qubits
 
 basis = 'sto-3g'
@@ -355,9 +366,22 @@ for p in range(0, molecule.n_electrons):
     for q in range(p+1, molecule.n_electrons):
         for a in range(molecule.n_electrons, n_spinorbitals):
             for b in range(a+1, n_spinorbitals):
-                 two_elec = openfermion.FermionOperator(((a,1),(p,0),(b,1),(q,0)))-openfermion.FermionOperator(((q,1),(b,0),(p,1),(a,0)))
-                 parameters.append(0)
-                 SQ_CC_ops.append(two_elec)
+                if abs(hamiltonian_op.two_body_tensor[p,a,b,q]) < 1e-8:
+                    print(" Dropping term %4i %4i %4i %4i" %(p,a,b,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,a,b,q])
+                    continue
+                two_elec = openfermion.FermionOperator(((a,1),(p,0),(b,1),(q,0)))-openfermion.FermionOperator(((q,1),(b,0),(p,1),(a,0)))
+                parameters.append(0)
+                SQ_CC_ops.append(two_elec)
+
+order = list(range(len(SQ_CC_ops)))
+random.shuffle(order)
+
+#n_doubles = 10
+#order = order[0:n_doubles]
+#parameters = parameters[0:n_doubles]
+
+print(" Order: ", order)
+SQ_CC_ops = [ SQ_CC_ops[i] for i in order]
 #for p in range(0, n_spinorbitals-1):
 #    q = p+1
 #    for r in range(p, n_spinorbitals-1):
@@ -370,11 +394,22 @@ for p in range(0, molecule.n_electrons):
 Count t1 second-quantized operations, add a parameter for each one, and add each one to the list
 ***CURRENTLY DOES NOT DISCRIMINATE AGAINST SPIN-FLIPS***
 '''
+singles = []
 for p in range(0, molecule.n_electrons):
     for q in range(molecule.n_electrons, n_spinorbitals):
+        if abs(hamiltonian_op.one_body_tensor[p,q]) < 1e-8:
+            print(" Dropping term %4i %4i" %(p,q), " V= %+6.1e" %hamiltonian_op.one_body_tensor[p,q])
+            continue
         one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
         parameters.append(0)
-        SQ_CC_ops.append(one_elec)
+        singles.append(one_elec)
+        #SQ_CC_ops.append(one_elec)
+
+order = list(range(len(singles)))
+random.shuffle(order)
+print(" Order: ", order)
+singles = [ singles[i] for i in order]
+SQ_CC_ops.extend(singles)
 
 print(" Number of parameters: ", len(parameters))
 #Jordan_Wigners into the Pauli Matrices, then computes their products as sparse matrices.
@@ -489,6 +524,7 @@ def callback(parameters):
     print(" Iter:%4i Current Energy = %20.16f Gradient Norm %10.1e Gradient Max %10.1e" %(global_iter,
         global_energy, err, np.max(np.abs(global_der))))
     global_iter += 1
+    sys.stdout.flush()
 
 
 #for p in range(len(parameters)):
@@ -505,5 +541,7 @@ def callback(parameters):
 
 print(" Start optimization. Starting energy: %12.8f" %SPE(parameters))
 
-opt_result = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-7, 'disp': True}, method = 'BFGS', callback=callback)
+opt_result = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-6, 'disp': True}, method = 'BFGS', callback=callback)
+
+print(" Finished: %20.12f" % global_energy)
 
