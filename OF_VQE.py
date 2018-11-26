@@ -5,13 +5,24 @@ import os
 import numpy as np
 import copy
 import random
+import logging
+
+#Logging Preferences
+'''
+Switch to DEBUG level and filemode 'w' to look at an individual optimization.
+'''
+logging.basicConfig(filename='app.log', filemode='a', format='%(message)s')
+logging.getLogger().setLevel(logging.INFO)
 
 #Manually initialize state
 basis = 'sto-3g'
 multiplicity = 1
-geometry = [('H', (0,0,0)),('H', (0,0,1.5)),('H', (0, 0, 3)), ('H',(0, 0, 4.5))]
+geometry = [('H', (0, 1, 1)), ('H', (0, 1, -1)), ('O', (0, 0, 0))]
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
 molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_ccsd = 1, run_fci=1)
+logging.debug('Molecule: '+str(geometry))
+logging.debug('Qubits: '+str(molecule.n_qubits))
+logging.debug('Spin-Orbitals: '+str(molecule.n_orbitals*2))
 n_spinorbitals = int(molecule.n_orbitals*2)
 
 #Build p-h reference and map it to JW transform
@@ -26,7 +37,6 @@ parameters = []
 
 #Second_quantized operations (not Jordan-Wignered)
 SQ_CC_ops = []
-
 
 '''
 Count t2 second-quantized operations, add a parameter for each one, and add each one to the list
@@ -54,6 +64,10 @@ for p in range(0, molecule.n_electrons):
 JW_CC_ops = []
 for classical_op in SQ_CC_ops:
     JW_CC_ops.append(openfermion.transforms.get_sparse_operator(classical_op, n_qubits = molecule.n_qubits))
+
+#Shuffle order of operations at random.  Feel free to comment this out.
+random.shuffle(JW_CC_ops)
+
 '''
 SPE based on a traditional, untrotterized ansatz
 v'=exp(a+b+...+n)v
@@ -80,10 +94,7 @@ def Trotter_SPE(parameters):
     assert(new_bra.dot(new_state).toarray()[0][0]-1<0.0000001)
     energy = new_bra.dot(hamiltonian.dot(new_state))
     return energy.toarray()[0][0].real
-
-
-                 
-                
+                         
 #Numerical trotterized gradient
 def Numerical_Trot_Grad(parameters):
     grad = []
@@ -94,6 +105,7 @@ def Numerical_Trot_Grad(parameters):
         para[k]-=.00000002
         diff -= Trotter_SPE(para)
         grad.append(diff/.00000002)
+    grad = reversed(grad)
     return np.asarray(grad)
 
 def Five_Point_Grad(parameters):
@@ -113,6 +125,7 @@ def Five_Point_Grad(parameters):
         r2 = Trotter_SPE(reve2)
         diff = (-f2+8*f1-8*r1+r2)/(1.2e-6)
         grad.append(diff)
+    grad = reversed(grad)
     return np.asarray(grad)
 
 #Analytical trotter gradient
@@ -146,10 +159,18 @@ def Recurse(parameters, grad, hbra, ket, term):
     return np.asarray(grad)
 
 def callback(parameters):
-    print(Trotter_SPE(parameters))
+    global iterations
+    logging.debug(Trotter_SPE(parameters))
+    iterations+= 1
 
+global iterations
+iterations = 1
 
+logging.debug('HF = '+str(molecule.hf_energy))
+logging.debug('CCSD = '+str(molecule.ccsd_energy))
+logging.debug('FCI = '+str(molecule.fci_energy))
+logging.debug('Optimizing:')
+optimization = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-5, 'disp': True}, method = 'BFGS', callback=callback)
 
-
-
-scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-7, 'disp': True}, method = 'BFGS', callback=callback)
+logging.info(Trotter_SPE(optimization.x)-molecule.fci_energy)
+logging.debug('Converged in '+str(iterations)+ 'iterations.')
