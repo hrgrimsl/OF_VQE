@@ -12,7 +12,7 @@ import logging
 Switch to DEBUG level and filemode 'w' to look at an individual optimization.
 '''
 logging.basicConfig(filename='app.log', filemode='a', format='%(message)s')
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.DEBUG)
 
 #Manually initialize state
 basis = 'sto-3g'
