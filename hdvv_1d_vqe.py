@@ -7,6 +7,7 @@ import copy
 import random 
 import sys
 
+import argparse
 import hdvv
 import qubit
 
@@ -16,6 +17,10 @@ from lib import ci_string
 from qubit import *
 
 from openfermion import *
+
+from scipy.sparse.csgraph import dijkstra
+
+#import igraph
 
 def update_ivqe_ref(parameters):
     new_state = reference_ket
@@ -40,7 +45,7 @@ def get_neel(n_qubits):
     print(" Norm of neel state: ", scipy.sparse.linalg.norm(state))
     return state
 
-def fermionized_hf(system, ham):
+def fermionized_hf(system, ham, KJ_ratio):
     print(" Do HF on spin lattice")
     print(" Number of qubits = ", system["n_qubits"])
     lattice = QubitLattice(system["n_qubits"])
@@ -70,7 +75,7 @@ def fermionized_hf(system, ham):
                 J12[j,i] = J12[i,j] 
 
     # Make isotropic
-    K12 = J12*2.0
+    K12 = J12*KJ_ratio
   
     print(" J12 and K12:")
     print(" J12: ")
@@ -258,6 +263,30 @@ def fermionized_hf(system, ham):
     return molecular_hamiltonian
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#   Setup input arguments
+parser = argparse.ArgumentParser(description='Run VQE',
+formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+parser.add_argument('-s','--seed', type=int, default=1, help='Should I use a random seed?', required=False)
+parser.add_argument('-K', type=float, default=-1, help='K(SzSz)', required=False)
+parser.add_argument('-J', type=float, default=-1, help='J(SxSx+SySy)', required=False)
+args = vars(parser.parse_args())
+
 n_sites = 10 
 j12 = np.zeros((n_sites,n_sites))
 
@@ -265,18 +294,19 @@ lat_type = "1d chain"
 
 if lat_type == "1d chain":
     for i in range(n_sites-1):
-        j12[i,i+1] -= 1
-        j12[i+1,i] -= 1
+        j12[i,i+1] = 1
+        j12[i+1,i] = 1
 
-    j12[0,n_sites-1] -= 1
-    j12[n_sites-1,0] -= 1
+    j12[0,n_sites-1] = 1
+    j12[n_sites-1,0] = 1
+j12 = j12*args['J']
 print(j12)
 
 lattice = np.ones((n_sites))
 lattice_guess = np.ones((n_sites))
 j12_guess = j12[0:4][0:4] 
 
-np.random.seed(2)
+np.random.seed(args['seed'])
 
 do_hdvv_diag = 0
 if do_hdvv_diag:
@@ -318,9 +348,10 @@ for hi in range(n_sites):
         ham.append( [ [[hi,"Z"],[hj,"Z"]], -.5*hij ]  )
 
 
-
 #JW transform Hamiltonian computed classically with OFPsi4
-hamiltonian_op = fermionized_hf(system, ham)
+
+KJ_ratio = args['K'] / args['J']
+hamiltonian_op = fermionized_hf(system, ham, KJ_ratio)
 hamiltonian = openfermion.transforms.get_sparse_operator(hamiltonian_op)
 
 global global_der 
@@ -374,6 +405,7 @@ for p in range(0, molecule.n_electrons):
                 SQ_CC_ops.append(two_elec)
 
 order = list(range(len(SQ_CC_ops)))
+random.seed(args['seed'])
 random.shuffle(order)
 
 #n_doubles = 10
@@ -405,30 +437,115 @@ for p in range(0, molecule.n_electrons):
         singles.append(one_elec)
         #SQ_CC_ops.append(one_elec)
 
+#SQ_CC_ops = list(reversed(SQ_CC_ops))
 order = list(range(len(singles)))
 random.shuffle(order)
 print(" Order: ", order)
 singles = [ singles[i] for i in order]
+#SQ_CC_ops.extend(list(reversed(singles)))
 SQ_CC_ops.extend(singles)
+
+for op in SQ_CC_ops:
+    print(op)
+
 
 print(" Number of parameters: ", len(parameters))
 #Jordan_Wigners into the Pauli Matrices, then computes their products as sparse matrices.
 JW_CC_ops = []
 for classical_op in SQ_CC_ops:
     JW_CC_ops.append(openfermion.transforms.get_sparse_operator(classical_op, n_qubits = molecule.n_qubits))
+
+
+
+#[fci_e, fci_v] = scipy.sparse.linalg.eigs(hamiltonian,1)
+#print(" FCI energy: %12.8f" %fci_e[0])
+print(" Build commutators <[A,H]>:")
+AHcom = []
+ABHcom = np.zeros((len(JW_CC_ops), len(JW_CC_ops)))
+for opAi in range(len(JW_CC_ops)):
+    opA = JW_CC_ops[opAi]
+    AHc = hamiltonian.dot(opA) - opA.dot(hamiltonian)
+    #v = fci_v[:,0]
+    #print(v.shape, AHc.shape)
+    #print(type(v), type(AHc))
+    #fci_com =  v.T.conj().dot(AHc.dot(v)) 
+    ref_com =  reference_ket.T.conj().dot(AHc.dot(reference_ket)) 
+    assert(ref_com.shape == (1,1))
+    #fci_com = fci_com.real
+    ref_com = ref_com[0,0].real
+    #print("%12.8f, %12.8f" %(ref_com, fci_com))
+    print("%12.8f" %(ref_com))
+    AHcom.append(ref_com*ref_com.conj())
+    for opBi in range(opAi+1, len(JW_CC_ops)):
+        opB = JW_CC_ops[opBi]
+        ABHc = AHc.dot(opB)-opB.dot(AHc)
+        ref_com =  reference_ket.T.conj().dot(ABHc.dot(reference_ket)) 
+        assert(ref_com.shape == (1,1))
+        ref_com = ref_com[0,0].real
+        print("     %12.8f" %(ref_com))
+        ABHcom[opAi,opBi] = ref_com*ref_com
+        ABHcom[opBi,opAi] = ref_com*ref_com
+
+N = len(JW_CC_ops)
+
+
+## Make graph
+#g = igraph.Graph()
+#N = len(JW_CC_ops)
+#g.add_vertices(N)
+#weights = []
+#labels = []
+#for i in range(0,N):
+#    labels.append(i+1)
+#    for j in range(i+1,N):
+#        print(i,j)
+#        g.add_edge(i,j)
+#        weights.append(ABHcom[i,j])
+
+
+
+
+new_order = np.argsort(AHcom)
+JW_CC_ops = [ JW_CC_ops[i] for i in new_order]
+AHcom = [ AHcom[i] for i in new_order]
+
+#distances, predecessors = dijkstra(ABHcom, return_predecessors=True)
+#print(distances)
+
+if 0:
+    D = np.zeros(N)
+    for i in range(N):
+        D[i] = np.sum(ABHcom[i,:])
+    L = np.diag(D)-ABHcom
+    L = L.real
+    [L_e, L_v] = scipy.linalg.eig(L)
+    new_order = np.argsort(L_e)
+    L_e = L_e[new_order] 
+    L_v = L_v[:,new_order] 
+    
+    new_order = np.argsort(L_v[:,2])
+    JW_CC_ops = [ JW_CC_ops[i] for i in reversed(new_order)]
+
+for com in AHcom:
+    print(com)
 '''
 SPE based on a traditional, untrotterized ansatz
 v'=exp(a+b+...+n)v
 '''
 def SPE(parameters):
+    global global_energy  
     generator = scipy.sparse.csc_matrix((2**(molecule.n_qubits), 2**(molecule.n_qubits)), dtype = complex)
     for mat_op in range(0,len(JW_CC_ops)):
         generator = generator+parameters[mat_op]*JW_CC_ops[mat_op]
     new_state = scipy.sparse.linalg.expm_multiply(generator, reference_ket)
     new_bra = new_state.transpose().conj()
     assert(new_bra.dot(new_state).toarray()[0][0]-1<0.0000001)
+    
     energy = new_bra.dot(hamiltonian.dot(new_state))
-    return energy.toarray()[0][0].real
+    global_energy = energy.toarray()[0][0].real
+    assert(global_energy.imag <  1e-14)
+    global_energy = global_energy.real
+    return global_energy 
 
 '''
 SPE based on full, 1st-order Trotter decomposition
@@ -521,8 +638,11 @@ def callback(parameters):
     global global_energy  
     global global_iter 
     err = np.sqrt(np.vdot(global_der, global_der))
-    print(" Iter:%4i Current Energy = %20.16f Gradient Norm %10.1e Gradient Max %10.1e" %(global_iter,
-        global_energy, err, np.max(np.abs(global_der))))
+    try:
+        print(" Iter:%4i Current Energy = %20.16f Gradient Norm %10.1e Gradient Max %10.1e" %(global_iter,
+            global_energy, err, np.max(np.abs(global_der))))
+    except:
+        print(" Iter:%4i Current Energy = %20.16f " %(global_iter, global_energy))
     global_iter += 1
     sys.stdout.flush()
 
@@ -541,6 +661,7 @@ def callback(parameters):
 
 print(" Start optimization. Starting energy: %12.8f" %SPE(parameters))
 
+#opt_result = scipy.optimize.minimize(SPE, parameters, options = {'gtol': 1e-6, 'disp': True}, method = 'BFGS', callback=callback)
 opt_result = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-6, 'disp': True}, method = 'BFGS', callback=callback)
 
 print(" Finished: %20.12f" % global_energy)
