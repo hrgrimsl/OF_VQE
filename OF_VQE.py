@@ -8,6 +8,7 @@ import random
 import logging
 import argparse
 import math
+from Classical_Amps import Harvest_CCSD_Amps
 
 #Parse Initial Arguments
 parser = argparse.ArgumentParser()
@@ -18,6 +19,8 @@ parser.add_argument('-s', '--seed', type=int, default=111596, help='Random seed.
 parser.add_argument('-p', '--protocol', type=str, default='random', help='Protocol for ordering terms in Trotter approximation.')
 parser.add_argument('-sys', '--system', type=str, default='H2O', help='Which chemical system listed do you want to solve?')
 parser.add_argument('-d', '--dis', type=float, default=0.0, help='Dissociation parameter in angstroms')
+parser.add_argument('-cc', '--ccfit', type=bool, default=False, help='Use CCSD amplitudes as initial thetas?')
+parser.add_argument('-b', '--basis', type=str, default='sto-3g', help='Basis set')
 args = parser.parse_args()
 
 #Seed RNG
@@ -28,8 +31,8 @@ logging.basicConfig(filename=args.log, filemode=args.readwrite, format='%(messag
 logging.getLogger().setLevel(eval('logging.%s' %args.mode))
 logging.debug(args)
 
-#Manually initialize state
-basis = 'sto-3g'
+#Manually initialize stateSS
+basis = args.basis
 r = args.dis
 if args.system == 'H2O':
     multiplicity = 1
@@ -50,11 +53,20 @@ elif args.system == 'LiH':
 elif args.system == 'H8':
     multiplicity = 1
     geometry = [('H', (0,0,0)), ('H', (.74+r,0,0)), ('H', (4.48,0,0)), ('H', (5.22+r,0,0)), ('H', (8.96,0,0)), ('H', (9.7+r,0,0)), ('H', (13.44, 0, 0)), ('H', (14.18+r, 0,0))]
+elif args.system == 'H4':
+    multiplicity = 1
+    geometry = [('H', (0,0,0)), ('H', (.74+r,0,0)), ('H', (4.48,0,0)), ('H', (5.22+r,0,0))]
+elif args.system == 'H2':
+    multiplicity = 1
+    geometry = [('H', (0,0,0)), ('H', (.74+r,0,0))]
 else:
    logging.critical('Unsupported system.')
-molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
-molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_ccsd = 1, run_fci=1)
 
+
+molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
+molecule.filename = args.system
+molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2 = 1, run_ccsd = 1, run_fci=1, delete_output=False)
+molecule = Harvest_CCSD_Amps(molecule)
 logging.debug('Molecule: '+str(geometry))
 logging.debug('Qubits: '+str(molecule.n_qubits))
 logging.debug('Spin-Orbitals: '+str(molecule.n_orbitals*2))
@@ -82,7 +94,10 @@ for p in range(0, molecule.n_electrons):
         for a in range(molecule.n_electrons, n_spinorbitals):
             for b in range(a+1, n_spinorbitals):
                  two_elec = openfermion.FermionOperator(((a,1),(p,0),(b,1),(q,0)))-openfermion.FermionOperator(((q,1),(b,0),(p,1),(a,0)))
-                 parameters.append(0)
+                 if args.ccfit == True:
+                     parameters.append(molecule.ccsd_double_amps[a][p][b][q])
+                 else:
+                     parameters.append(0)
                  SQ_CC_ops.append(two_elec)
 
 '''
@@ -92,8 +107,12 @@ Count t1 second-quantized operations, add a parameter for each one, and add each
 for p in range(0, molecule.n_electrons):
     for q in range(molecule.n_electrons, n_spinorbitals):
         one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
-        parameters.append(0)
+        if args.ccfit == True:
+            parameters.append(molecule.ccsd_single_amps[p][q])
+        else:
+            parameters.append(0)
         SQ_CC_ops.append(one_elec)
+
 
 #Jordan_Wigners into the Pauli Matrices, then computes their products as sparse matrices.
 JW_CC_ops = []
@@ -109,28 +128,34 @@ if args.protocol == 'random':
         op_indices.append(i)
     random.shuffle(op_indices)
     new_ops = []
+    new_parameters = []
     for i in op_indices:
         new_ops.append(JW_CC_ops[i])
+        new_parameters.append(parameters[i])
     logging.debug(op_indices)
     JW_CC_ops=new_ops
+    parameters=new_parameters
 
 #Commutator Evaluations:
 ham_ket = hamiltonian.dot(reference_ket)
+
+#[e^A,H]
 def Commutator(op_no):
     op = JW_CC_ops[op_no]
     bra = ham_ket.transpose()
     ket = scipy.sparse.linalg.expm_multiply(op, reference_ket)
-    comm = bra.dot(ket)    
+    comm = bra.dot(ket)
     bra = (scipy.sparse.linalg.expm_multiply(-op, reference_ket)).transpose().conj()
     ket = ham_ket
     comm = comm-bra.dot(ket)
     return abs(comm.toarray()[0][0])
 
+#[A,H]
 def Commutator2(op_no):
     op = JW_CC_ops[op_no]
     bra = ham_ket.transpose()
     ket = op.dot(reference_ket)
-    comm = bra.dot(ket)    
+    comm = bra.dot(ket)
     bra = reference_bra.dot(op)
     ket = ham_ket
     comm = comm-bra.dot(ket)
@@ -141,51 +166,64 @@ if args.protocol == 'increasing_comms':
     op_indices = []
     for i in range(0, len(JW_CC_ops)):
         op_indices.append(i)
-    op_indices = sorted(op_indices, key=Commutator)         
+    op_indices = sorted(op_indices, key=Commutator)
     new_ops = []
+    new_parameters = []
     for i in op_indices:
         new_ops.append(JW_CC_ops[i])
+        new_parameters.append(parameters[i])
     logging.info('Increasing Commutators:')
     logging.debug(op_indices)
     JW_CC_ops=new_ops
-    
-if args.protocol == 'decreasing_comms':
+    parameters = new_parameters
+
+elif args.protocol == 'decreasing_comms':
     op_indices = []
     for i in range(0, len(JW_CC_ops)):
         op_indices.append(i)
-    op_indices = sorted(op_indices, key=Commutator, reverse=True)         
+    op_indices = sorted(op_indices, key=Commutator, reverse=True)
     new_ops = []
+    new_parameters = []
     for i in op_indices:
         new_ops.append(JW_CC_ops[i])
+        new_parameters.append(parameters[i])
     logging.info('Decreasing Commutators:')
     logging.debug(op_indices)
     JW_CC_ops=new_ops
+    parameters = new_parameters
 
-if args.protocol == 'increasing_unexp_comms': 
+elif args.protocol == 'increasing_unexp_comms':
     logging.info('Correlation: '+str(molecule.fci_energy-molecule.hf_energy))
     op_indices = []
+    new_parameters = []
     for i in range(0, len(JW_CC_ops)):
         op_indices.append(i)
-    op_indices = sorted(op_indices, key=Commutator2)         
+    op_indices = sorted(op_indices, key=Commutator2)
     new_ops = []
     for i in op_indices:
         new_ops.append(JW_CC_ops[i])
+        new_parameters.append(parameters[i])
     logging.info('Increasing Unexponentiated Commutators:')
     logging.debug(op_indices)
     JW_CC_ops=new_ops
+    parameters = new_parameters
 
-if args.protocol == 'decreasing_unexp_comms':
+elif args.protocol == 'decreasing_unexp_comms':
     op_indices = []
     for i in range(0, len(JW_CC_ops)):
         op_indices.append(i)
-    op_indices = sorted(op_indices, key=Commutator2, reverse=True)         
+    op_indices = sorted(op_indices, key=Commutator2, reverse=True)
     new_ops = []
+    new_parameters = []
     for i in op_indices:
         new_ops.append(JW_CC_ops[i])
+        new_parameters.append(parameters[i])
     logging.info('Decreasing Unexponentiated Commutators:')
     logging.debug(op_indices)
+    parameters = new_parameters
     JW_CC_ops=new_ops
 
+logging.debug(str(len(parameters))+' parameters.')
 '''
 SPE based on a traditional, untrotterized ansatz
 v'=exp(a+b+...+n)v
@@ -211,7 +249,7 @@ def Trotter_SPE(parameters):
     new_bra = new_state.transpose().conj()
     assert(new_bra.dot(new_state).toarray()[0][0]-1<0.0000001)
     energy = new_bra.dot(hamiltonian.dot(new_state))
-    return energy.toarray()[0][0].real                       
+    return energy.toarray()[0][0].real
 
 #Analytical trotter gradient
 def Trotter_Gradient(parameters):
@@ -245,6 +283,7 @@ def callback(parameters):
     global iterations
     logging.debug(Trotter_SPE(parameters))
     iterations+= 1
+
 
 global iterations
 iterations = 1
