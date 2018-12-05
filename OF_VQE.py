@@ -21,6 +21,7 @@ parser.add_argument('-sys', '--system', type=str, default='H2O', help='Which che
 parser.add_argument('-d', '--dis', type=float, default=0.0, help='Dissociation parameter in angstroms')
 parser.add_argument('-cc', '--ccfit', type=bool, default=False, help='Use CCSD amplitudes as initial thetas?')
 parser.add_argument('-b', '--basis', type=str, default='sto-3g', help='Basis set')
+parser.add_argument('-f', '--filter', type=bool, default=False, help='Use Hamiltonian as a criteria for removing irrelevant terms')
 args = parser.parse_args()
 
 #Seed RNG
@@ -77,7 +78,10 @@ reference_ket = scipy.sparse.csc_matrix(openfermion.jw_configuration_state(list(
 reference_bra = reference_ket.transpose().conj()
 
 #JW transform Hamiltonian computed classically with OFPsi4
-hamiltonian = openfermion.transforms.get_sparse_operator(molecule.get_molecular_hamiltonian())
+tensor_hamiltonian = molecule.get_molecular_hamiltonian()
+singles_hamiltonian = tensor_hamiltonian.one_body_tensor
+doubles_hamiltonian = tensor_hamiltonian.two_body_tensor
+hamiltonian = openfermion.transforms.get_sparse_operator(tensor_hamiltonian)
 
 #Thetas
 parameters = []
@@ -85,58 +89,80 @@ parameters = []
 #Second_quantized operations (not Jordan-Wignered)
 SQ_CC_ops = []
 
-'''
-Count t2 second-quantized operations, add a parameter for each one, and add each one to the list
-***CURRENTLY DOES NOT DISCRIMINATE AGAINST SPIN-FLIPS***
-'''
-for p in range(0, molecule.n_electrons):
-    for q in range(p+1, molecule.n_electrons):
-        for a in range(molecule.n_electrons, n_spinorbitals):
-            for b in range(a+1, n_spinorbitals):
-                 two_elec = openfermion.FermionOperator(((a,1),(p,0),(b,1),(q,0)))-openfermion.FermionOperator(((q,1),(b,0),(p,1),(a,0)))
-                 if args.ccfit == True:
-                     parameters.append(molecule.ccsd_double_amps[a][p][b][q])
-                 else:
-                     parameters.append(0)
-                 SQ_CC_ops.append(two_elec)
+#Form alpha_occs, beta_occs, alpha_noccs, beta_noccs
+orbitals = range(0, n_spinorbitals)
+a_occs = [k for k in orbitals if k%2==0 and k<molecule.n_electrons]
+b_occs = [k for k in orbitals if k%2==1 and k<molecule.n_electrons]
+a_noccs = [k for k in orbitals if k%2==0 and k>=molecule.n_electrons]
+b_noccs = [k for k in orbitals if k%2==1 and k>=molecule.n_electrons]
 
-'''
-Count t1 second-quantized operations, add a parameter for each one, and add each one to the list
-***CURRENTLY DOES NOT DISCRIMINATE AGAINST SPIN-FLIPS***
-'''
-for p in range(0, molecule.n_electrons):
-    for q in range(molecule.n_electrons, n_spinorbitals):
-        one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
-        if args.ccfit == True:
-            parameters.append(molecule.ccsd_single_amps[p][q])
-        else:
-            parameters.append(0)
-        SQ_CC_ops.append(one_elec)
+#aa singles
+for i in a_occs:
+    for a in a_noccs:
+        one_elec = openfermion.FermionOperator(((a,1),(i,0)))-openfermion.FermionOperator(((i,1),(a,0)))
+        if args.filter==False or abs(singles_hamiltonian[a][i])>0 or abs(singles_hamiltonian[i][a])>0:    
+            if args.ccfit == True:
+                parameters.append(molecule.ccsd_single_amps[a][i])
+            else:
+                parameters.append(0)
+            SQ_CC_ops.append(one_elec)
 
+#bb singles
+for i in b_occs:
+    for a in b_noccs:
+        one_elec = openfermion.FermionOperator(((a,1),(i,0)))-openfermion.FermionOperator(((i,1),(a,0))) 
+        if args.filter==False or abs(singles_hamiltonian[a][i])>0 or abs(singles_hamiltonian[i][a])>0:
+            if args.ccfit == True:
+                parameters.append(molecule.ccsd_single_amps[a][i])
+            else:
+                parameters.append(0)
+            SQ_CC_ops.append(one_elec)
+
+##aa doubles
+for i in a_occs:
+    for j in [k for k in a_occs if k>i]:
+        for a in a_noccs:
+            for b in [k for k in a_noccs if k>a]:
+                two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
+                if args.filter==False or abs(doubles_hamiltonian[b][a][j][i])>0 or abs(doubles_hamiltonian[i][j][a][b])>0:
+                    if args.ccfit == True:
+                        parameters.append(molecule.ccsd_double_amps[b][a][j][i])
+                    else:
+                        parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+
+##bb doubles
+for i in b_occs:
+    for j in [k for k in b_occs if k>i]:
+        for a in b_noccs:
+            for b in [k for k in b_noccs if k>a]:
+                two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
+                if args.filter==False or abs(doubles_hamiltonian[b][a][j][i])>0 or abs(doubles_hamiltonian[i][j][a][b])>0: 
+                    if args.ccfit == True:
+                        parameters.append(molecule.ccsd_double_amps[b][a][j][i])
+                    else:
+                        parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+
+#ab doubles
+for i in a_occs:
+    for j in b_occs:
+        for a in a_noccs:
+            for b in b_noccs:
+                two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
+                if args.filter==False or abs(doubles_hamiltonian[b][a][j][i])>0 or abs(doubles_hamiltonian[i][j][a][b])>0:
+                    if args.ccfit == True:
+                        parameters.append(molecule.ccsd_double_amps[b][a][j][i])
+                    else:
+                        parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
 
 #Jordan_Wigners into the Pauli Matrices, then computes their products as sparse matrices.
 JW_CC_ops = []
 for classical_op in SQ_CC_ops:
     JW_CC_ops.append(openfermion.transforms.get_sparse_operator(classical_op, n_qubits = molecule.n_qubits))
 
-#Use some sorting method for the operators.
-
-#Random ordering based on a seed input
-if args.protocol == 'random':
-    op_indices = []
-    for i in range(0, len(JW_CC_ops)):
-        op_indices.append(i)
-    random.shuffle(op_indices)
-    new_ops = []
-    new_parameters = []
-    for i in op_indices:
-        new_ops.append(JW_CC_ops[i])
-        new_parameters.append(parameters[i])
-    logging.debug(op_indices)
-    JW_CC_ops=new_ops
-    parameters=new_parameters
-
-#Commutator Evaluations:
+#Commutator Evaluation Functions:
 ham_ket = hamiltonian.dot(reference_ket)
 
 #[e^A,H]
@@ -161,7 +187,22 @@ def Commutator2(op_no):
     comm = comm-bra.dot(ket)
     return abs(comm.toarray()[0][0])
 
+
 #Special Orders of Interest:
+if args.protocol == 'random':
+    op_indices = []
+    for i in range(0, len(JW_CC_ops)):
+        op_indices.append(i)
+    random.shuffle(op_indices)
+    new_ops = []
+    new_parameters = []
+    for i in op_indices:
+        new_ops.append(JW_CC_ops[i])
+        new_parameters.append(parameters[i])
+    logging.debug(op_indices)
+    JW_CC_ops=new_ops
+    parameters=new_parameters
+
 if args.protocol == 'increasing_comms':
     op_indices = []
     for i in range(0, len(JW_CC_ops)):
@@ -284,14 +325,13 @@ def callback(parameters):
     logging.debug(Trotter_SPE(parameters))
     iterations+= 1
 
-
-global iterations
-iterations = 1
-
 logging.debug('HF = '+str(molecule.hf_energy))
 logging.debug('CCSD = '+str(molecule.ccsd_energy))
 logging.debug('FCI = '+str(molecule.fci_energy))
 logging.debug('Optimizing:')
+
+global iterations
+iterations = 1
 optimization = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-5, 'disp': True}, method = 'BFGS', callback=callback)
 logging.debug('Converged in '+str(iterations)+ ' iterations.')
 logging.info(Trotter_SPE(optimization.x)-molecule.fci_energy)
