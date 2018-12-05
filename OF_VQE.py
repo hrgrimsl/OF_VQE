@@ -22,6 +22,7 @@ parser.add_argument('-d', '--dis', type=float, default=0.0, help='Dissociation p
 parser.add_argument('-cc', '--ccfit', type=bool, default=False, help='Use CCSD amplitudes as initial thetas?')
 parser.add_argument('-b', '--basis', type=str, default='sto-3g', help='Basis set')
 parser.add_argument('-f', '--filter', type=bool, default=False, help='Use Hamiltonian as a criteria for removing irrelevant terms')
+parser.add_argument('-c', '--config', type=str, default='ijab', help='What types of transitions do we allow?')
 args = parser.parse_args()
 
 #Seed RNG
@@ -89,73 +90,111 @@ parameters = []
 #Second_quantized operations (not Jordan-Wignered)
 SQ_CC_ops = []
 
-#Form alpha_occs, beta_occs, alpha_noccs, beta_noccs
-orbitals = range(0, n_spinorbitals)
-a_occs = [k for k in orbitals if k%2==0 and k<molecule.n_electrons]
-b_occs = [k for k in orbitals if k%2==1 and k<molecule.n_electrons]
-a_noccs = [k for k in orbitals if k%2==0 and k>=molecule.n_electrons]
-b_noccs = [k for k in orbitals if k%2==1 and k>=molecule.n_electrons]
+def ops_pqrs():
 
-#aa singles
-for i in a_occs:
-    for a in a_noccs:
-        one_elec = openfermion.FermionOperator(((a,1),(i,0)))-openfermion.FermionOperator(((i,1),(a,0)))
-        if args.filter==False or abs(singles_hamiltonian[a][i])>0 or abs(singles_hamiltonian[i][a])>0:    
-            if args.ccfit == True:
-                parameters.append(molecule.ccsd_single_amps[a][i])
-            else:
-                parameters.append(0)
-            SQ_CC_ops.append(one_elec)
+    #Doubles
+    pairs = []
+    for i in range(0, n_spinorbitals):
+        for j in range(i+1, n_spinorbitals):
+            pairs.append([i,j])
+    for pair1 in range(0, len(pairs)):
+        for pair2 in range(pair1, len(pairs)):
+            a, b = pairs[pair2]
+            i, j = pairs[pair1]
+            two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
+            if args.filter==False or abs(doubles_hamiltonian[j][i][a][b])>1e-8 or abs(doubles_hamiltonian[b][a][i][j])>1e-8:
+                if args.ccfit == True:
+                    parameters.append(molecule.ccsd_double_amps[b][a][j][i])
+                else:
+                    parameters.append(0)
+                SQ_CC_ops.append(two_elec)
+    #Singles
+    for i in range(0, n_spinorbitals):
+        for a in range(i, n_spinorbitals):
+            one_elec = openfermion.FermionOperator(((a,1),(i,0)))-openfermion.FermionOperator(((i,1),(a,0)))
+            if args.filter==False or abs(singles_hamiltonian[a][i])>1e-8 or abs(singles_hamiltonian[i][a])>1e-8:
+                if args.ccfit == True:
+                    parameters.append(molecule.ccsd_single_amps[a][i])
+                else:
+                    parameters.append(0)
+                SQ_CC_ops.append(one_elec)
+    return(SQ_CC_ops, parameters)
 
-#bb singles
-for i in b_occs:
-    for a in b_noccs:
-        one_elec = openfermion.FermionOperator(((a,1),(i,0)))-openfermion.FermionOperator(((i,1),(a,0))) 
-        if args.filter==False or abs(singles_hamiltonian[a][i])>0 or abs(singles_hamiltonian[i][a])>0:
-            if args.ccfit == True:
-                parameters.append(molecule.ccsd_single_amps[a][i])
-            else:
-                parameters.append(0)
-            SQ_CC_ops.append(one_elec)
+def ops_ijab():
+    #Form alpha_occs, beta_occs, alpha_noccs, beta_noccs
+    orbitals = range(0, n_spinorbitals)
+    a_occs = [k for k in orbitals if k%2==0 and k<molecule.n_electrons]
+    b_occs = [k for k in orbitals if k%2==1 and k<molecule.n_electrons]
+    a_noccs = [k for k in orbitals if k%2==0 and k>=molecule.n_electrons]
+    b_noccs = [k for k in orbitals if k%2==1 and k>=molecule.n_electrons]
 
-##aa doubles
-for i in a_occs:
-    for j in [k for k in a_occs if k>i]:
+    #aa singles
+    for i in a_occs:
         for a in a_noccs:
-            for b in [k for k in a_noccs if k>a]:
-                two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
-                if args.filter==False or abs(doubles_hamiltonian[b][a][j][i])>0 or abs(doubles_hamiltonian[i][j][a][b])>0:
-                    if args.ccfit == True:
-                        parameters.append(molecule.ccsd_double_amps[b][a][j][i])
-                    else:
-                        parameters.append(0)
-                    SQ_CC_ops.append(two_elec)
+            one_elec = openfermion.FermionOperator(((a,1),(i,0)))-openfermion.FermionOperator(((i,1),(a,0)))
+            if args.filter==False or abs(singles_hamiltonian[i][a])>1e-8 or abs(singles_hamiltonian[a][i])>1e-8:
+                if args.ccfit == True:
+                    parameters.append(molecule.ccsd_single_amps[a][i])
+                else:
+                    parameters.append(0)
+                SQ_CC_ops.append(one_elec)
 
-##bb doubles
-for i in b_occs:
-    for j in [k for k in b_occs if k>i]:
+    #bb singles
+    for i in b_occs:
         for a in b_noccs:
-            for b in [k for k in b_noccs if k>a]:
-                two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
-                if args.filter==False or abs(doubles_hamiltonian[b][a][j][i])>0 or abs(doubles_hamiltonian[i][j][a][b])>0: 
-                    if args.ccfit == True:
-                        parameters.append(molecule.ccsd_double_amps[b][a][j][i])
-                    else:
-                        parameters.append(0)
-                    SQ_CC_ops.append(two_elec)
+            one_elec = openfermion.FermionOperator(((a,1),(i,0)))-openfermion.FermionOperator(((i,1),(a,0)))
+            if args.filter==False or abs(singles_hamiltonian[i][a])>1e-8 or abs(singles_hamiltonian[a][i])>1e-8:
+                if args.ccfit == True:
+                    parameters.append(molecule.ccsd_single_amps[a][i])
+                else:
+                    parameters.append(0)
+                SQ_CC_ops.append(one_elec)
 
-#ab doubles
-for i in a_occs:
-    for j in b_occs:
-        for a in a_noccs:
-            for b in b_noccs:
-                two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
-                if args.filter==False or abs(doubles_hamiltonian[b][a][j][i])>0 or abs(doubles_hamiltonian[i][j][a][b])>0:
-                    if args.ccfit == True:
-                        parameters.append(molecule.ccsd_double_amps[b][a][j][i])
-                    else:
-                        parameters.append(0)
-                    SQ_CC_ops.append(two_elec)
+    ##aa doubles
+    for i in a_occs:
+        for j in [k for k in a_occs if k>i]:
+            for a in a_noccs:
+                for b in [k for k in a_noccs if k>a]:
+                    two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
+                    if args.filter==False or abs(doubles_hamiltonian[j][i][a][b])>1e-8 or abs(doubles_hamiltonian[b][a][i][j])>1e-8:
+                        if args.ccfit == True:
+                            parameters.append(molecule.ccsd_double_amps[b][a][j][i])
+                        else:
+                            parameters.append(0)
+                        SQ_CC_ops.append(two_elec)
+
+    ##bb doubles
+    for i in b_occs:
+        for j in [k for k in b_occs if k>i]:
+            for a in b_noccs:
+                for b in [k for k in b_noccs if k>a]:
+                    two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
+                    if args.filter==False or abs(doubles_hamiltonian[j][i][a][b])>1e-8 or abs(doubles_hamiltonian[b][a][i][j])>1e-8:
+                        if args.ccfit == True:
+                            parameters.append(molecule.ccsd_double_amps[b][a][j][i])
+                        else:
+                            parameters.append(0)
+                        SQ_CC_ops.append(two_elec)
+
+    #ab doubles
+    for i in a_occs:
+        for j in b_occs:
+            for a in a_noccs:
+                for b in b_noccs:
+                    two_elec = openfermion.FermionOperator(((b,1),(a,1),(j,0),(i,0)))-openfermion.FermionOperator(((i,1),(j,1),(a,0),(b,0)))
+                    if args.filter==False or abs(doubles_hamiltonian[j][i][a][b])>1e-8 or abs(doubles_hamiltonian[b][a][i][j])>1e-8:
+                        if args.ccfit == True:
+                            parameters.append(molecule.ccsd_double_amps[b][a][j][i])
+                        else:
+                            parameters.append(0)
+                        SQ_CC_ops.append(two_elec)
+
+    return (SQ_CC_ops, parameters)
+
+if args.config == 'ijab':
+    SQ_CC_ops, parameters = ops_ijab()
+if args.config == 'pqrs':
+    SQ_CC_ops, parameters = ops_pqrs()
 
 #Jordan_Wigners into the Pauli Matrices, then computes their products as sparse matrices.
 JW_CC_ops = []
