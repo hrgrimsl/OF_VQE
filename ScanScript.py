@@ -10,4 +10,4 @@ for i in range(0, 5):
     os.system('python OF_VQE.py -l '+str(first)+'.log -m INFO -rw a -p increasing_comms -sys '+str(first)+' -d '+str(i/10))
     os.system('python OF_VQE.py -l '+str(first)+'.log -m INFO -rw a -p decreasing_comms -sys '+str(first)+' -d '+str(i/10))
     for j in range(0, 100):
-        os.system('python OF_VQE.py -l '+str(first)+'.log -m INFO -rw a -s '+str(j)+' -p random -sys '+str(first)+' -d '+str(i))
+        os.system('python OF_VQE.py -l '+str(first)+'.log -m INFO -rw a -s '+str(j)+' -p random -sys '+str(first)+' -d '+str(i/10))

@@ -66,7 +66,7 @@ else:
 
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
 molecule.filename = args.system
-molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2 = 1, run_ccsd = 1, run_fci=1, delete_output=False)
+molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2 = 1, run_ccsd = 1, run_fci=1, delete_input=False, delete_output=False)
 molecule = Harvest_CCSD_Amps(molecule)
 logging.debug('Molecule: '+str(geometry))
 logging.debug('Qubits: '+str(molecule.n_qubits))
