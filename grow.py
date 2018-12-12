@@ -520,6 +520,7 @@ if args['grow'] == "opt1":
     op_indices = []
     parameters = []
     JW_CC_ops = []
+    SQ_CC_ops = []
     print(" Now start to grow the ansatz")
     for n_op in range(0,50):
         print("\n\n\n Check each new operator for coupling")
@@ -548,10 +549,21 @@ if args['grow'] == "opt1":
         
         update_index = sorted_order[0]
         op_indices.append(update_index)
+        SQ_CC_ops.insert(0,SQ_CC_ops_save[update_index])
         JW_CC_ops = cp.deepcopy(next_jw_ops[update_index])
         parameters = cp.deepcopy(next_params[update_index])
         print(" Best Energy = %12.8f " %next_couplings[update_index])
         print(op_indices)
+        
+        print(" -----------New ansatz----------- ")
+        print(" %4s %40s %12s" %("#","Term","Coeff"))
+        for si in range(len(SQ_CC_ops)):
+            s = SQ_CC_ops[si]
+            opstring = ""
+            for t in s.terms:
+                opstring += str(t)
+                break
+            print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
 
 
 
