@@ -285,9 +285,16 @@ formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-s','--seed', type=int, default=1, help='Should I use a random seed?', required=False)
 parser.add_argument('-K', type=float, default=-1, help='K(SzSz)', required=False)
 parser.add_argument('-J', type=float, default=-1, help='J(SxSx+SySy)', required=False)
+parser.add_argument('-a','--ansatz', type=str, default='ijab_spinfree', help="Which Ansatz to use",
+        choices=["ijab","ijab_spinfree", "pqrs", "pqrs_spinfree", "hamiltonian"], required=False)
+parser.add_argument('--sort', type=str, default=None, help="Which Ansatz ordering to use",
+        choices=["AH","AH_reversed"], required=False)
+parser.add_argument('--filter', type=str, default="AH", help="Filter out t amplitudes based on a criterion",
+        choices=["AH","None"], required=False)
+parser.add_argument('--uccsd', action='store_true', help="Do un-trotterized version?", required=False)
 args = vars(parser.parse_args())
 
-n_sites = 4 
+n_sites = 6 
 j12 = np.zeros((n_sites,n_sites))
 
 lat_type = "1d chain"
@@ -384,10 +391,11 @@ if 1:
     basis = 'sto-3g'
     multiplicity = 1
     geometry = [('H', (0,0,1.5)),('H', (0, 0, 3)), ('H', (0,0,4.5)), ('H', (0, 0, 6))]
-    r1 = 1.0
-    geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1)), ('H', (0,0,7*r1)), ('H', (0,0,8*r1))]
+    r1 = 1.5
     geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1))]
+    geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1)), ('H', (0,0,7*r1)), ('H', (0,0,8*r1))]
     geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1))]
+    geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,r1,1*r1)), ('H', (0,r1,2*r1)), ('H',(0,r1,3*r1))]
     molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
     molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=1, run_cisd=1, run_ccsd = 1, run_fci=1, delete_input=0)
     n_spinorbitals = int(molecule.n_orbitals*2)
@@ -414,7 +422,6 @@ parameters = []
 #Second_quantized operations (not Jordan-Wignered)
 SQ_CC_ops = []
 
-do_shuffle = False 
 alpha_orbs = list(range(int(n_spinorbitals/2)))
 beta_orbs = list(range(int(n_spinorbitals/2)))
 alpha_orbs = [ alpha_orbs[i]*2 for i in alpha_orbs]
@@ -422,10 +429,14 @@ beta_orbs = [ beta_orbs[i]*2+1 for i in beta_orbs]
 print("Alpha Orbs:", alpha_orbs)
 print("Beta Orbs :", beta_orbs)
 
-alpha_occ = alpha_orbs[0:molecule.get_n_alpha_electrons()]
-alpha_vir = alpha_orbs[molecule.get_n_alpha_electrons()::]
-beta_occ = beta_orbs[0:molecule.get_n_beta_electrons()]
-beta_vir = beta_orbs[molecule.get_n_beta_electrons()::]
+
+n_alpha = molecule.get_n_alpha_electrons()
+n_beta = molecule.get_n_beta_electrons()
+
+alpha_occ = alpha_orbs[0:n_alpha]
+alpha_vir = alpha_orbs[n_alpha::]
+beta_occ = beta_orbs[0:n_beta]
+beta_vir = beta_orbs[n_beta::]
 
 
 print(alpha_occ, alpha_vir)
@@ -436,51 +447,168 @@ print(beta_occ, beta_vir)
 Count t2 second-quantized operations, add a parameter for each one, and add each one to the list
 ***CURRENTLY DOES NOT DISCRIMINATE AGAINST SPIN-FLIPS***
 '''
-for i in alpha_occ:
-    for j in alpha_occ:
-        for a in alpha_vir:
-            for b in alpha_vir:
-                if i>=j:
-                    continue
-                if a>=b:
-                    continue
-                print(" Term %4i %4i %4i %4i" %(i,a,b,j), " V= %12.8f %12.8f" %(hamiltonian_op.two_body_tensor[i,a,b,j], hamiltonian_op.two_body_tensor[j,a,b,i]))
-                two_elec = openfermion.FermionOperator(((a,1),(i,0),(b,1),(j,0)))-openfermion.FermionOperator(((j,1),(b,0),(i,1),(a,0)))
-                parameters.append(0)
-                SQ_CC_ops.append(two_elec)
-for i in beta_occ:
-    for j in beta_occ:
-        for a in beta_vir:
-            for b in beta_vir:
-                if i>=j:
-                    continue
-                if a>=b:
-                    continue
-                print(" Term %4i %4i %4i %4i" %(i,a,b,j), " V= %12.8f %12.8f" %(hamiltonian_op.two_body_tensor[i,a,b,j], hamiltonian_op.two_body_tensor[j,a,b,i]))
-                two_elec = openfermion.FermionOperator(((a,1),(i,0),(b,1),(j,0)))-openfermion.FermionOperator(((j,1),(b,0),(i,1),(a,0)))
-                parameters.append(0)
-                SQ_CC_ops.append(two_elec)
-for i in alpha_occ:
-    for j in beta_occ:
-        for a in alpha_vir:
-            for b in beta_vir:
-                print(" Term %4i %4i %4i %4i" %(i,a,b,j), " V= %12.8f %12.8f" %(hamiltonian_op.two_body_tensor[i,a,b,j], hamiltonian_op.two_body_tensor[j,a,b,i]))
-                two_elec = openfermion.FermionOperator(((a,1),(i,0),(b,1),(j,0)))-openfermion.FermionOperator(((j,1),(b,0),(i,1),(a,0)))
-                parameters.append(0)
-                SQ_CC_ops.append(two_elec)
-#for p in range(0, molecule.n_electrons):
-#    for q in range(p+1, molecule.n_electrons):
-#        for a in range(molecule.n_electrons, n_spinorbitals):
-#            for b in range(a+1, n_spinorbitals):
-#                print(" Term %4i %4i %4i %4i" %(p,a,b,q), " V= %12.8f %12.8f" %(hamiltonian_op.two_body_tensor[p,a,b,q], hamiltonian_op.two_body_tensor[q,a,b,p]))
-#                #if abs(hamiltonian_op.two_body_tensor[p,a,b,q]) < 1e-8:
-#                #    print(" Dropping term %4i %4i %4i %4i" %(p,a,b,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,a,b,q])
-#                #    #continue
-#                two_elec = openfermion.FermionOperator(((a,1),(p,0),(b,1),(q,0)))-openfermion.FermionOperator(((q,1),(b,0),(p,1),(a,0)))
-#                parameters.append(0)
-#                SQ_CC_ops.append(two_elec)
+#ansatz_type = "pqrs"
+#ansatz_type = "ijab"
+#ansatz_type = "pqrs_spinfree"
+#ansatz_type = "ijab_spinfree"
 
+ansatz_type = args['ansatz']
 
+if ansatz_type == "ijab":
+    for i in alpha_occ:
+        for j in alpha_occ:
+            for a in alpha_vir:
+                for b in alpha_vir:
+                    if i>=j:
+                        continue
+                    if a>=b:
+                        continue
+                    #print(" Term %4i %4i %4i %4i" %(i,a,b,j), " V= %12.8f %12.8f" %(hamiltonian_op.two_body_tensor[i,a,b,j], hamiltonian_op.two_body_tensor[j,a,b,i]))
+                    two_elec = openfermion.FermionOperator(((a,1),(i,0),(b,1),(j,0)))-openfermion.FermionOperator(((j,1),(b,0),(i,1),(a,0)))
+                    parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+    for i in beta_occ:
+        for j in beta_occ:
+            for a in beta_vir:
+                for b in beta_vir:
+                    if i>=j:
+                        continue
+                    if a>=b:
+                        continue
+                    #print(" Term %4i %4i %4i %4i" %(i,a,b,j), " V= %12.8f %12.8f" %(hamiltonian_op.two_body_tensor[i,a,b,j], hamiltonian_op.two_body_tensor[j,a,b,i]))
+                    two_elec = openfermion.FermionOperator(((a,1),(i,0),(b,1),(j,0)))-openfermion.FermionOperator(((j,1),(b,0),(i,1),(a,0)))
+                    parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+    for i in alpha_occ:
+        for j in beta_occ:
+            for a in alpha_vir:
+                for b in beta_vir:
+                    #print(" Term %4i %4i %4i %4i" %(i,a,b,j), " V= %12.8f %12.8f" %(hamiltonian_op.two_body_tensor[i,a,b,j], hamiltonian_op.two_body_tensor[j,a,b,i]))
+                    two_elec = openfermion.FermionOperator(((a,1),(i,0),(b,1),(j,0)))-openfermion.FermionOperator(((j,1),(b,0),(i,1),(a,0)))
+
+                    parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+
+elif ansatz_type == "pqrs":
+    #aa
+    pq = 0
+    for p in alpha_orbs:
+        for q in alpha_orbs:
+            if p>q:
+                continue
+            rs = 0
+            for r in alpha_orbs:
+                for s in alpha_orbs:
+                    if r>s:
+                        continue
+                    if pq<rs:
+                        continue
+                    if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
+                        #print(" Dropping term %4i %4i %4i %4i" %(p,r,s,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,r,s,q])
+                        continue
+                    two_elec = openfermion.FermionOperator(((r,1),(p,0),(s,1),(q,0)))-openfermion.FermionOperator(((q,1),(s,0),(p,1),(r,0)))
+                    parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+                    rs += 1
+            pq += 1
+
+    #bb
+    pq = 0
+    for p in beta_orbs:
+        for q in beta_orbs:
+            if p>q:
+                continue
+            rs = 0
+            for r in beta_orbs:
+                for s in beta_orbs:
+                    if r>s:
+                        continue
+                    if pq<rs:
+                        continue
+                    if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
+                        #print(" Dropping term %4i %4i %4i %4i" %(p,r,s,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,r,s,q])
+                        continue
+                    two_elec = openfermion.FermionOperator(((r,1),(p,0),(s,1),(q,0)))-openfermion.FermionOperator(((q,1),(s,0),(p,1),(r,0)))
+                    parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+                    rs += 1
+            pq += 1
+
+    #ab
+    pq = 0
+    for p in alpha_orbs:
+        for q in beta_orbs:
+            rs = 0
+            for r in alpha_orbs:
+                for s in beta_orbs:
+                    if pq<rs:
+                        continue
+                    if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
+                        #print(" Dropping term %4i %4i %4i %4i" %(p,r,s,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,r,s,q])
+                        continue
+                    two_elec = openfermion.FermionOperator(((r,1),(p,0),(s,1),(q,0)))-openfermion.FermionOperator(((q,1),(s,0),(p,1),(r,0)))
+                    parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+                    rs += 1
+            pq += 1
+
+elif ansatz_type == "ijab_spinfree":
+    for p in range(0, molecule.n_electrons):
+        for q in range(p+1, molecule.n_electrons):
+            for a in range(molecule.n_electrons, n_spinorbitals):
+                for b in range(a+1, n_spinorbitals):
+                    if abs(hamiltonian_op.two_body_tensor[p,a,b,q]) < 1e-8:
+                        #print(" Dropping term %4i %4i %4i %4i" %(p,a,b,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,a,b,q])
+                        continue
+                    two_elec = openfermion.FermionOperator(((a,1),(p,0),(b,1),(q,0)))-openfermion.FermionOperator(((q,1),(b,0),(p,1),(a,0)))
+                    parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+
+elif ansatz_type == "pqrs_spinfree":
+    n = n_spinorbitals
+    pq = 0 
+    for p in range(0, n):
+        for q in range(p+1, n):
+            rs = 0
+            for r in range(p, n):
+                for s in range(r+1, n):
+                    #if pq<rs:
+                    #    continue
+                    two_elec = openfermion.FermionOperator(((r,1),(p,0),(s,1),(q,0)))-openfermion.FermionOperator(((q,1),(s,0),(p,1),(r,0)))
+                    if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
+                        print(" Dropping term %4i %4i %4i %4i" %(p,r,s,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,r,s,q])
+                        continue
+                    print(two_elec)
+                    parameters.append(0)
+                    SQ_CC_ops.append(two_elec)
+                    rs += 1
+            pq += 1
+
+elif ansatz_type == "hamiltonian":
+    for h in hamiltonian_op:
+        val = hamiltonian_op[h]
+        if abs(val) < 1e-3:
+            continue
+
+        if len(h) == 2:
+            print(h)
+            p = h[0][0]
+            q = h[1][0]
+            op = openfermion.FermionOperator(((p,1),(q,0)))-openfermion.FermionOperator(((q,1),(p,0)))
+            parameters.append(0)
+            SQ_CC_ops.append(op)
+        if len(h) == 4:
+            print(h,hamiltonian_op[h])
+            p = h[0][0]
+            q = h[1][0]
+            r = h[2][0]
+            s = h[3][0]
+            op = openfermion.FermionOperator(((p,1),(q,1),(r,0),(s,0)))-openfermion.FermionOperator(((s,1),(r,1),(q,0),(p,0)))
+            #op = openfermion.FermionOperator(((p,1),(r,0),(q,1),(s,0)))-openfermion.FermionOperator(((s,1),(q,0),(r,1),(p,0)))
+            parameters.append(0)
+            SQ_CC_ops.append(op)
+
+do_shuffle = 1 
 if do_shuffle: 
     order = list(range(len(SQ_CC_ops)))
     random.seed(args['seed'])
@@ -495,26 +623,68 @@ Count t1 second-quantized operations, add a parameter for each one, and add each
 '''
 singles = []
 
-#aa
-for p in alpha_occ:
-    for q in alpha_vir:
-        one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
-        parameters.append(0)
-        singles.append(one_elec)
-#bb
-for p in beta_occ:
-    for q in beta_vir:
-        one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
-        parameters.append(0)
-        singles.append(one_elec)
-#for p in range(0, molecule.n_electrons):
-#    for q in range(molecule.n_electrons, n_spinorbitals):
-#        #if abs(hamiltonian_op.one_body_tensor[p,q]) < 1e-8:
-#        #    print(" Dropping term %4i %4i" %(p,q), " V= %+6.1e" %hamiltonian_op.one_body_tensor[p,q])
-#        #    continue
-#        one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
-#        parameters.append(0)
-#        singles.append(one_elec)
+
+if ansatz_type == "ijab":
+    #aa
+    for p in alpha_occ:
+        for q in alpha_vir:
+            one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
+            parameters.append(0)
+            singles.append(one_elec)
+    #bb
+    for p in beta_occ:
+        for q in beta_vir:
+            one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
+            parameters.append(0)
+            singles.append(one_elec)
+
+elif ansatz_type == "pqrs":
+    #aa
+    for p in alpha_orbs:
+        for q in alpha_orbs:
+            if p>=q:
+                continue
+            #if abs(hamiltonian_op.one_body_tensor[p,q]) < 1e-8:
+            #    print(" Dropping term %4i %4i" %(p,q), " V= %+6.1e" %hamiltonian_op.one_body_tensor[p,q])
+            #    continue
+            one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
+            parameters.append(0)
+            singles.append(one_elec)
+    #bb
+    for p in beta_orbs:
+        for q in beta_orbs:
+            if p>q:
+                continue
+            #if abs(hamiltonian_op.one_body_tensor[p,q]) < 1e-8:
+            #    print(" Dropping term %4i %4i" %(p,q), " V= %+6.1e" %hamiltonian_op.one_body_tensor[p,q])
+            #    continue
+            one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
+            parameters.append(0)
+            singles.append(one_elec)
+
+elif ansatz_type == "ijab_spinfree":
+    for p in range(0, molecule.n_electrons):
+        for q in range(molecule.n_electrons, n_spinorbitals):
+            if abs(hamiltonian_op.one_body_tensor[p,q]) < 1e-8:
+                #print(" Dropping term %4i %4i" %(p,q), " V= %+6.1e" %hamiltonian_op.one_body_tensor[p,q])
+                continue
+            one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
+            parameters.append(0)
+            singles.append(one_elec)
+
+elif ansatz_type == "pqrs_spinfree":
+    n = n_spinorbitals
+    for p in range(0, n):
+        for q in range(p+1, n):
+            if abs(hamiltonian_op.one_body_tensor[p,q]) < 1e-8:
+                print(" Dropping term %4i %4i" %(p,q), " V= %+6.1e" %hamiltonian_op.one_body_tensor[p,q])
+                continue
+                pass
+            one_elec = openfermion.FermionOperator(((q,1),(p,0)))-openfermion.FermionOperator(((p,1),(q,0)))
+            parameters.append(0)
+            singles.append(one_elec)
+
+
 
 if do_shuffle: 
     order = list(range(len(singles)))
@@ -584,13 +754,30 @@ N = len(JW_CC_ops)
 
 
 
-sort_AH = 0
-if sort_AH:
+    
+if args['sort'] == "AH":
     new_order = np.argsort(AHcom)
-    #new_order = reversed(np.argsort(AHcom))
+    JW_CC_ops = [ JW_CC_ops[i] for i in new_order]
+    AHcom = [ AHcom[i] for i in new_order]
+elif args['sort'] == "AH_reversed":
+    new_order = np.argsort(AHcom)[::-1]
     JW_CC_ops = [ JW_CC_ops[i] for i in new_order]
     AHcom = [ AHcom[i] for i in new_order]
 
+if args['filter'] == "AH":
+    print("Filter out t amplitudes based on size of <[A,H]>")
+    new_ops = []
+    new_par = []
+    new_AH  = []
+    for c in range(len(AHcom)):
+        if abs(AHcom[c]) > 1e-8:
+            new_ops.append(JW_CC_ops[c])
+            new_par.append(parameters[c])
+            new_AH.append(AHcom[c])
+    parameters = new_par
+    JW_CC_ops = new_ops
+    AHcom = new_AH
+    print('New number of parameters: ', len(JW_CC_ops))
 #distances, predecessors = dijkstra(ABHcom, return_predecessors=True)
 #print(distances)
 
@@ -616,8 +803,10 @@ if 0:
 
     print(L)
 
-for com in AHcom:
-    print(com)
+print(" Commutators [A,H]:")
+for a in AHcom:
+    print("   %12.8f" %a)
+
 '''
 SPE based on a traditional, untrotterized ansatz
 v'=exp(a+b+...+n)v
@@ -749,13 +938,20 @@ def callback(parameters):
 #print("\n Error: ")
 #print(np.linalg.norm(der_num-der_ana))
 
+
+##initial guess
+#for p in range(len(parameters)):
+#    parameters[p] = -AHcom[p]
+
 print(" Start optimization. Starting energy: %12.8f" %SPE(parameters))
 
-if 0:
+if args['uccsd'] == True:
     opt_result = scipy.optimize.minimize(SPE, parameters, options = {'gtol': 1e-6, 'disp': True}, method = 'BFGS', callback=callback)
     print(" Finished: %20.12f" % global_energy)
 
     parameters = opt_result['x']
+    for p in parameters:
+        print(p)
 
 opt_result = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-6, 'disp': True}, method = 'BFGS', callback=callback)
 parameters = opt_result['x']
