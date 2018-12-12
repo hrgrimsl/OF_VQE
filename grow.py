@@ -36,6 +36,8 @@ parser.add_argument('--sort', type=str, default=None, help="Which Ansatz orderin
         choices=["AH","AH_reversed"], required=False)
 parser.add_argument('--filter', type=str, default="None", help="Filter out t amplitudes based on a criterion",
         choices=["AH","None"], required=False)
+parser.add_argument('-g', '--grow', type=str, default="AH", help="How to grow the ansatz",
+        choices=["AH","opt1"], required=False)
 parser.add_argument('--uccsd', action='store_true', help="Do un-trotterized version?", required=False)
 args = vars(parser.parse_args())
 
@@ -462,54 +464,94 @@ SQ_CC_ops_save = cp.deepcopy(SQ_CC_ops)
 #for p in parameters:
 #    print(p)
 
-op_indices = []
-parameters = []
-JW_CC_ops = []
-SQ_CC_ops = []
-curr_state = 1.0*reference_ket
-print(" Now start to grow the ansatz")
-for n_op in range(0,50):
-    print("\n\n\n Check each new operator for coupling")
-    next_com = []
-    print(" Measure commutators:")
-    for op_trial in range(len(AHcom)):
-
-        AHc = AHcom[op_trial]
-        com = curr_state.transpose().conj().dot(AHc.dot(curr_state))
-        assert(com.shape == (1,1))
-        com = com[0,0]
-        assert(np.isclose(com.imag,0))
-        com = com.real
-        opstring = ""
-        for t in SQ_CC_ops_save[op_trial].terms:
-            opstring += str(t)
-            break
-        print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
-        next_com.append(abs(com))
-        #print(" %i %20s %12.8f" %(op_trial, SQ_CC_ops[op_trial], com) )
+if args['grow'] == "AH":
+    op_indices = []
+    parameters = []
+    JW_CC_ops = []
+    SQ_CC_ops = []
+    curr_state = 1.0*reference_ket
+    print(" Now start to grow the ansatz")
+    for n_op in range(0,50):
+        print("\n\n\n Check each new operator for coupling")
+        next_com = []
+        print(" Measure commutators:")
+        for op_trial in range(len(AHcom)):
     
-    next_index = next_com.index(max(next_com))
-    print(" Add operator %4i" %next_index)
-    parameters.insert(0,0)
-    JW_CC_ops.insert(0,JW_CC_ops_save[next_index])
-    SQ_CC_ops.insert(0,SQ_CC_ops_save[next_index])
+            AHc = AHcom[op_trial]
+            com = curr_state.transpose().conj().dot(AHc.dot(curr_state))
+            assert(com.shape == (1,1))
+            com = com[0,0]
+            assert(np.isclose(com.imag,0))
+            com = com.real
+            opstring = ""
+            for t in SQ_CC_ops_save[op_trial].terms:
+                opstring += str(t)
+                break
+            print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
+            next_com.append(abs(com))
+            #print(" %i %20s %12.8f" %(op_trial, SQ_CC_ops[op_trial], com) )
+        
+        next_index = next_com.index(max(next_com))
+        print(" Add operator %4i" %next_index)
+        parameters.insert(0,0)
+        JW_CC_ops.insert(0,JW_CC_ops_save[next_index])
+        SQ_CC_ops.insert(0,SQ_CC_ops_save[next_index])
+        
+        trial_model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
+        opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
+                options = {'gtol': 1e-6, 'disp':False}, method = 'BFGS', callback=trial_model.callback)
     
-    trial_model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
-    opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
-            options = {'gtol': 1e-6, 'disp':False}, method = 'BFGS', callback=trial_model.callback)
+        parameters = list(opt_result['x'])
+        curr_state = trial_model.prepare_state(parameters)
+        print(" Finished: %20.12f" % trial_model.curr_energy)
+        print(" -----------New ansatz----------- ")
+        print(" %4s %40s %12s" %("#","Term","Coeff"))
+        for si in range(len(SQ_CC_ops)):
+            s = SQ_CC_ops[si]
+            opstring = ""
+            for t in s.terms:
+                opstring += str(t)
+                break
+            print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
 
-    parameters = list(opt_result['x'])
-    curr_state = trial_model.prepare_state(parameters)
-    print(" Finished: %20.12f" % trial_model.curr_energy)
-    print(" -----------New ansatz----------- ")
-    print(" %4s %40s %12s" %("#","Term","Coeff"))
-    for si in range(len(SQ_CC_ops)):
-        s = SQ_CC_ops[si]
-        opstring = ""
-        for t in s.terms:
-            opstring += str(t)
-            break
-        print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+
+
+if args['grow'] == "opt1":
+    op_indices = []
+    parameters = []
+    JW_CC_ops = []
+    print(" Now start to grow the ansatz")
+    for n_op in range(0,50):
+        print("\n\n\n Check each new operator for coupling")
+        next_couplings = []
+        next_params = []
+        next_jw_ops = []
+        for op_trial in range(len(JW_CC_ops_save)):
+            
+            print(" Trial Operator: %5i Number of Operators: %i" %( op_trial, len(parameters)+1))
+            trial_params = cp.deepcopy(parameters)
+            trial_jw_ops = cp.deepcopy(JW_CC_ops)
+           
+            trial_params.append(0)
+            trial_jw_ops.append(JW_CC_ops_save[op_trial])
+            
+            trial_model = tUCCSD(hamiltonian,trial_jw_ops, reference_ket, trial_params)
+            opt_result = scipy.optimize.minimize(trial_model.energy, trial_params, jac=trial_model.gradient, 
+                    options = {'gtol': 1e-6, 'disp':True}, method = 'BFGS', callback=trial_model.callback)
+            print(" Finished: %20.12f" % trial_model.curr_energy)
+            next_couplings.append(trial_model.curr_energy)
+            next_params.append(list(opt_result['x']))
+            next_jw_ops.append(trial_jw_ops)
+    
+        # Sort couplings ascending
+        sorted_order = np.argsort(next_couplings)
+        
+        update_index = sorted_order[0]
+        op_indices.append(update_index)
+        JW_CC_ops = cp.deepcopy(next_jw_ops[update_index])
+        parameters = cp.deepcopy(next_params[update_index])
+        print(" Best Energy = %12.8f " %next_couplings[update_index])
+        print(op_indices)
 
 
 
