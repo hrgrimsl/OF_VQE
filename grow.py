@@ -15,6 +15,7 @@ from lib import Hamiltonian
 from lib import ci_string 
 
 from qubit import *
+from tVQE import *
 
 from openfermion import *
 
@@ -42,9 +43,6 @@ args = vars(parser.parse_args())
 
 #JW transform Hamiltonian computed classically with OFPsi4
 
-KJ_ratio = args['K'] / args['J']
-hamiltonian_op = fermionized_hf(system, ham, KJ_ratio)
-hamiltonian = openfermion.transforms.get_sparse_operator(hamiltonian_op)
 
 global global_der 
 global global_energy  
@@ -53,51 +51,32 @@ global_der = np.array([])
 global_energy = 0.0 
 global_iter = 0 
 
-print(system)
-n_qubits = system['n_qubits']
-n_alpha  = system['n_alpha']
-n_beta   = system['n_beta']
-n_spinorbitals = n_qubits
 
 basis = 'sto-3g'
 multiplicity = 1
-geometry = [("He",(0,0,0))]
+geometry = [('H', (0,0,1.5)),('H', (0, 0, 3)), ('H', (0,0,4.5)), ('H', (0, 0, 6))]
+r1 = 1.5
+geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1)), ('H', (0,0,7*r1)), ('H', (0,0,8*r1))]
+geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1))]
+geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,r1,1*r1)), ('H', (0,r1,2*r1)), ('H',(0,r1,3*r1))]
+geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1))]
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
-molecule.n_electrons = int(n_qubits/2) 
-molecule.n_qubits = n_qubits
+molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=1, run_cisd=1, run_ccsd = 1, run_fci=1, delete_input=0)
+n_spinorbitals = int(molecule.n_orbitals*2)
+print('HF energy      %20.16f au' %(molecule.hf_energy))
+print('MP2 energy     %20.16f au' %(molecule.mp2_energy))
+print('CISD energy    %20.16f au' %(molecule.cisd_energy))
+print('CCSD energy    %20.16f au' %(molecule.ccsd_energy))
+print('FCI energy     %20.16f au' %(molecule.fci_energy))
+
 
 #Build p-h reference and map it to JW transform
-print(" n_alpha, n_beta, n_qubits ", n_alpha, n_beta, n_qubits)
-reference_ket = scipy.sparse.csc_matrix(openfermion.jw_configuration_state(list(range(molecule.n_electrons)), n_qubits)).transpose()
-#reference_ket = get_neel(n_qubits)
+reference_ket = scipy.sparse.csc_matrix(openfermion.jw_configuration_state(list(range(0,molecule.n_electrons)), molecule.n_qubits)).transpose()
 reference_bra = reference_ket.transpose().conj()
-
-if 1:
-    basis = 'sto-3g'
-    multiplicity = 1
-    geometry = [('H', (0,0,1.5)),('H', (0, 0, 3)), ('H', (0,0,4.5)), ('H', (0, 0, 6))]
-    r1 = 1.5
-    geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1))]
-    geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1)), ('H', (0,0,7*r1)), ('H', (0,0,8*r1))]
-    geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1))]
-    geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,r1,1*r1)), ('H', (0,r1,2*r1)), ('H',(0,r1,3*r1))]
-    molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
-    molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=1, run_cisd=1, run_ccsd = 1, run_fci=1, delete_input=0)
-    n_spinorbitals = int(molecule.n_orbitals*2)
-    print('HF energy      %20.16f au' %(molecule.hf_energy))
-    print('MP2 energy     %20.16f au' %(molecule.mp2_energy))
-    print('CISD energy    %20.16f au' %(molecule.cisd_energy))
-    print('CCSD energy    %20.16f au' %(molecule.ccsd_energy))
-    print('FCI energy     %20.16f au' %(molecule.fci_energy))
-
-
-    #Build p-h reference and map it to JW transform
-    reference_ket = scipy.sparse.csc_matrix(openfermion.jw_configuration_state(list(range(0,molecule.n_electrons)), molecule.n_qubits)).transpose()
-    reference_bra = reference_ket.transpose().conj()
-    #JW transform Hamiltonian computed classically with OFPsi4
-    hamiltonian_op = molecule.get_molecular_hamiltonian()
-    hamiltonian = openfermion.transforms.get_sparse_operator(hamiltonian_op)
-    print(reference_bra.dot(hamiltonian.dot(reference_ket)))
+#JW transform Hamiltonian computed classically with OFPsi4
+hamiltonian_op = molecule.get_molecular_hamiltonian()
+hamiltonian = openfermion.transforms.get_sparse_operator(hamiltonian_op)
+print(reference_bra.dot(hamiltonian.dot(reference_ket)))
 
 #print(" Reference energy: %12.8f" %reference_bra.dot(hamiltonian).dot(reference_ket)[0,0].real)
 
@@ -492,156 +471,62 @@ print(" Commutators [A,H]:")
 for a in AHcom:
     print("   %12.8f" %a)
 
-'''
-SPE based on a traditional, untrotterized ansatz
-v'=exp(a+b+...+n)v
-'''
-def SPE(parameters):
-    global global_energy  
-    generator = scipy.sparse.csc_matrix((2**(molecule.n_qubits), 2**(molecule.n_qubits)), dtype = complex)
-    for mat_op in range(0,len(JW_CC_ops)):
-        generator = generator+parameters[mat_op]*JW_CC_ops[mat_op]
-    new_state = scipy.sparse.linalg.expm_multiply(generator, reference_ket)
-    new_bra = new_state.transpose().conj()
-    assert(new_bra.dot(new_state).toarray()[0][0]-1<0.0000001)
+parameters_save = cp.deepcopy(parameters)
+JW_CC_ops_save = cp.deepcopy(JW_CC_ops)
+#JW_CC_ops = JW_CC_ops[0:1]
+#parameters = parameters[0:1]
+#
+#
+#model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
+#print(" Start optimization. Starting energy: %12.8f" %model.energy(parameters))
+#opt_result = scipy.optimize.minimize(model.energy, parameters, jac=model.gradient, options = {'gtol': 1e-6, 'disp':
+#    True}, method = 'BFGS', callback=model.callback)
+#print(" Finished: %20.12f" % model.curr_energy)
+#parameters = list(opt_result['x'])
+#for p in parameters:
+#    print(p)
+
+
+parameters = []
+JW_CC_ops = []
+print(" Now start to grow the ansatz")
+for n_op in range(0,20):
+    print("\n\n\n Check each new operator for coupling")
+    next_couplings = []
+    next_params = []
+    next_jw_ops = []
+    for op_trial in range(len(JW_CC_ops_save)):
+        
+        print(" Operator: ", op_trial)
+        trial_params = cp.deepcopy(parameters)
+        trial_jw_ops = cp.deepcopy(JW_CC_ops)
+       
+        trial_params.append(0)
+        trial_jw_ops.append(JW_CC_ops_save[op_trial])
+        
+        trial_model = tUCCSD(hamiltonian,trial_jw_ops, reference_ket, trial_params)
+        opt_result = scipy.optimize.minimize(trial_model.energy, trial_params, jac=trial_model.gradient, 
+                options = {'gtol': 1e-6, 'disp':True}, method = 'BFGS', callback=trial_model.callback)
+        print(" Finished: %20.12f" % trial_model.curr_energy)
+        next_couplings.append(trial_model.curr_energy)
+        next_params.append(list(opt_result['x']))
+        next_jw_ops.append(trial_jw_ops)
+
+    # Sort couplings ascending
+    sorted_order = np.argsort(next_couplings)
     
-    energy = new_bra.dot(hamiltonian.dot(new_state))
-    global_energy = energy.toarray()[0][0].real
-    assert(global_energy.imag <  1e-14)
-    global_energy = global_energy.real
-    return global_energy 
-
-'''
-SPE based on full, 1st-order Trotter decomposition
-v'=exp(a)exp(b)...exp(n)v
-'''
-def Trotter_SPE(parameters):
-    global global_energy  
-    new_state = reference_ket
-    for k in reversed(range(0, len(parameters))):
-        new_state = scipy.sparse.linalg.expm_multiply((parameters[k]*JW_CC_ops[k]), new_state)
-    new_bra = new_state.transpose().conj()
-    assert(new_bra.dot(new_state).toarray()[0][0]-1<0.0000001)
-    energy = new_bra.dot(hamiltonian.dot(new_state))
-    global_energy = energy.toarray()[0][0].real
-    assert(global_energy.imag <  1e-14)
-    global_energy = global_energy.real
-    return global_energy 
-
-
-                 
-                
-#Numerical trotterized gradient
-def Numerical_Trot_Grad(parameters):
-    global global_der
-    step_size = 1e-6
-    grad = []
-    for k in reversed(range(0, len(parameters))):
-        para = copy.copy(parameters)
-        para[k]+=step_size
-        diff = Trotter_SPE(para)
-        para[k]-=2*step_size
-        diff -= Trotter_SPE(para)
-        grad.append(diff/(step_size*2))
-    global_der = np.asarray(grad)
-    return np.asarray(grad)
-
-def Five_Point_Grad(parameters):
-    grad = []
-    for k in reversed(range(0, len(parameters))):
-        forw = copy.copy(parameters)
-        forw2 = copy.copy(parameters)
-        reve = copy.copy(parameters)
-        reve2 = copy.copy(parameters)
-        forw[k]+=1e-7
-        forw2[k]+=2e-7
-        reve[k]-=1e-7
-        reve2[k]-=2e-7
-        f2 = Trotter_SPE(forw2)
-        f1 = Trotter_SPE(forw)
-        r1 = Trotter_SPE(reve)
-        r2 = Trotter_SPE(reve2)
-        diff = (-f2+8*f1-8*r1+r2)/(1.2e-6)
-        grad.append(diff)
-    return np.asarray(grad)
-
-#Analytical trotter gradient
-def Trotter_Gradient(parameters):
-    global global_der 
-    grad = []
-    new_state = copy.copy(reference_ket)
-    for k in reversed(range(0, len(parameters))):
-        new_state = scipy.sparse.linalg.expm_multiply((parameters[k]*JW_CC_ops[k]), new_state)
-    new_bra = new_state.transpose().conj()
-    hbra = new_bra.dot(hamiltonian)
-    #H_l = hamiltonian
-    #H_r = hamiltonian
-    term = 0
-    ket = copy.copy(new_state)
-    grad = Recurse(parameters, grad, hbra, ket, term)
-    global_der = grad
-    return np.asarray(grad)
-
-#Recursive component of analytical trotter gradient
-def Recurse(parameters, grad, hbra, ket, term):
-    if term == 0:
-        hbra = hbra
-        ket = ket
-    else:
-        hbra = (scipy.sparse.linalg.expm_multiply(-JW_CC_ops[term-1]*parameters[term-1], hbra.transpose().conj())).transpose().conj()
-        ket = scipy.sparse.linalg.expm_multiply(-JW_CC_ops[term-1]*parameters[term-1], ket)
-    grad.append((2*hbra.dot(JW_CC_ops[term]).dot(ket).toarray()[0][0].real))
-    #grad.insert(0,(2*hbra.dot(JW_CC_ops[term]).dot(ket).toarray()[0][0].real))
-    if term<len(parameters)-1:
-        term += 1
-        Recurse(parameters, grad, hbra, ket, term)
-    return np.asarray(grad)
-
-def callback(parameters):
-    global global_der 
-    global global_energy  
-    global global_iter 
-    err = np.sqrt(np.vdot(global_der, global_der))
-    try:
-        print(" Iter:%4i Current Energy = %20.16f Gradient Norm %10.1e Gradient Max %10.1e" %(global_iter,
-            global_energy, err, np.max(np.abs(global_der))))
-    except:
-        print(" Iter:%4i Current Energy = %20.16f " %(global_iter, global_energy))
-    global_iter += 1
-    sys.stdout.flush()
-
-
-#for p in range(len(parameters)):
-#    parameters[p] = (random.random()-.5)*.001
-
-#der_num = Numerical_Trot_Grad(parameters)
-#der_ana = Trotter_Gradient(parameters)
-#print(" Numerical: ")
-#print(der_num)
-#print("\n Analytical: ")
-#print(der_ana)
-#print("\n Error: ")
-#print(np.linalg.norm(der_num-der_ana))
-
-
-##initial guess
-#for p in range(len(parameters)):
-#    parameters[p] = -AHcom[p]
-
-print(" Start optimization. Starting energy: %12.8f" %SPE(parameters))
+    update_index = sorted_order[0]
+    JW_CC_ops = cp.deepcopy(next_jw_ops[update_index])
+    parameters = cp.deepcopy(next_params[update_index])
+    print(" Best Energy = %12.8f " %next_couplings[update_index])
 
 if args['uccsd'] == True:
-    opt_result = scipy.optimize.minimize(SPE, parameters, options = {'gtol': 1e-6, 'disp': True}, method = 'BFGS', callback=callback)
-    print(" Finished: %20.12f" % global_energy)
-
+    uccsd = UCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
+    opt_result = scipy.optimize.minimize(uccsd.energy, parameters, options = {'gtol': 1e-6, 'disp':True}, method =
+            'BFGS', callback=uccsd.callback)
+    print(" Finished: %20.12f" % uccsd.curr_energy)
     parameters = opt_result['x']
     for p in parameters:
         print(p)
 
-opt_result = scipy.optimize.minimize(Trotter_SPE, parameters, jac=Trotter_Gradient, options = {'gtol': 1e-6, 'disp': True}, method = 'BFGS', callback=callback)
-parameters = opt_result['x']
-for p in parameters:
-    print(p)
-
-print(" Finished: %20.12f" % global_energy)
 
