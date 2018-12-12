@@ -56,8 +56,8 @@ basis = 'sto-3g'
 multiplicity = 1
 geometry = [('H', (0,0,1.5)),('H', (0, 0, 3)), ('H', (0,0,4.5)), ('H', (0, 0, 6))]
 r1 = 1.5
-geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1)), ('H', (0,0,7*r1)), ('H', (0,0,8*r1))]
 geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1))]
+geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1)), ('H', (0,0,7*r1)), ('H', (0,0,8*r1))]
 geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,r1,1*r1)), ('H', (0,r1,2*r1)), ('H',(0,r1,3*r1))]
 geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1))]
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
@@ -109,7 +109,6 @@ print(beta_occ, beta_vir)
 
 '''
 Count t2 second-quantized operations, add a parameter for each one, and add each one to the list
-***CURRENTLY DOES NOT DISCRIMINATE AGAINST SPIN-FLIPS***
 '''
 #ansatz_type = "pqrs"
 #ansatz_type = "ijab"
@@ -167,9 +166,9 @@ elif ansatz_type == "pqrs":
                         continue
                     if pq<rs:
                         continue
-                    if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
+                    #if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
                         #print(" Dropping term %4i %4i %4i %4i" %(p,r,s,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,r,s,q])
-                        continue
+                        #continue
                     two_elec = openfermion.FermionOperator(((r,1),(p,0),(s,1),(q,0)))-openfermion.FermionOperator(((q,1),(s,0),(p,1),(r,0)))
                     parameters.append(0)
                     SQ_CC_ops.append(two_elec)
@@ -189,9 +188,9 @@ elif ansatz_type == "pqrs":
                         continue
                     if pq<rs:
                         continue
-                    if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
+                    #if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
                         #print(" Dropping term %4i %4i %4i %4i" %(p,r,s,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,r,s,q])
-                        continue
+                        #continue
                     two_elec = openfermion.FermionOperator(((r,1),(p,0),(s,1),(q,0)))-openfermion.FermionOperator(((q,1),(s,0),(p,1),(r,0)))
                     parameters.append(0)
                     SQ_CC_ops.append(two_elec)
@@ -207,9 +206,9 @@ elif ansatz_type == "pqrs":
                 for s in beta_orbs:
                     if pq<rs:
                         continue
-                    if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
+                    #if abs(hamiltonian_op.two_body_tensor[p,r,s,q]) < 1e-8:
                         #print(" Dropping term %4i %4i %4i %4i" %(p,r,s,q), " V= %+6.1e" %hamiltonian_op.two_body_tensor[p,r,s,q])
-                        continue
+                        #continue
                     two_elec = openfermion.FermionOperator(((r,1),(p,0),(s,1),(q,0)))-openfermion.FermionOperator(((q,1),(s,0),(p,1),(r,0)))
                     parameters.append(0)
                     SQ_CC_ops.append(two_elec)
@@ -272,7 +271,7 @@ elif ansatz_type == "hamiltonian":
             parameters.append(0)
             SQ_CC_ops.append(op)
 
-do_shuffle = 1 
+do_shuffle = 0 
 if do_shuffle: 
     order = list(range(len(SQ_CC_ops)))
     random.seed(args['seed'])
@@ -486,18 +485,18 @@ JW_CC_ops_save = cp.deepcopy(JW_CC_ops)
 #for p in parameters:
 #    print(p)
 
-
+op_indices = []
 parameters = []
 JW_CC_ops = []
 print(" Now start to grow the ansatz")
-for n_op in range(0,20):
+for n_op in range(0,50):
     print("\n\n\n Check each new operator for coupling")
     next_couplings = []
     next_params = []
     next_jw_ops = []
     for op_trial in range(len(JW_CC_ops_save)):
         
-        print(" Operator: ", op_trial)
+        print(" Trial Operator: %5i Number of Operators: %i" %( op_trial, len(parameters)+1))
         trial_params = cp.deepcopy(parameters)
         trial_jw_ops = cp.deepcopy(JW_CC_ops)
        
@@ -516,9 +515,13 @@ for n_op in range(0,20):
     sorted_order = np.argsort(next_couplings)
     
     update_index = sorted_order[0]
+    op_indices.append(update_index)
     JW_CC_ops = cp.deepcopy(next_jw_ops[update_index])
     parameters = cp.deepcopy(next_params[update_index])
     print(" Best Energy = %12.8f " %next_couplings[update_index])
+    print(op_indices)
+
+
 
 if args['uccsd'] == True:
     uccsd = UCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
