@@ -487,7 +487,8 @@ if args['grow'] == "AH":
             for t in SQ_CC_ops_save[op_trial].terms:
                 opstring += str(t)
                 break
-            print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
+            if abs(com) > 1e-8:
+                print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
             next_com.append(abs(com))
             #print(" %i %20s %12.8f" %(op_trial, SQ_CC_ops[op_trial], com) )
         
