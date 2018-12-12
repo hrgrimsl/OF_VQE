@@ -34,7 +34,7 @@ parser.add_argument('-a','--ansatz', type=str, default='ijab_spinfree', help="Wh
         choices=["ijab","ijab_spinfree", "pqrs", "pqrs_spinfree", "hamiltonian"], required=False)
 parser.add_argument('--sort', type=str, default=None, help="Which Ansatz ordering to use",
         choices=["AH","AH_reversed"], required=False)
-parser.add_argument('--filter', type=str, default="AH", help="Filter out t amplitudes based on a criterion",
+parser.add_argument('--filter', type=str, default="None", help="Filter out t amplitudes based on a criterion",
         choices=["AH","None"], required=False)
 parser.add_argument('--uccsd', action='store_true', help="Do un-trotterized version?", required=False)
 args = vars(parser.parse_args())
@@ -376,17 +376,18 @@ ABHcom = np.zeros((len(JW_CC_ops), len(JW_CC_ops)))
 for opAi in range(len(JW_CC_ops)):
     opA = JW_CC_ops[opAi]
     AHc = hamiltonian.dot(opA) - opA.dot(hamiltonian)
-    #v = fci_v[:,0]
-    #print(v.shape, AHc.shape)
-    #print(type(v), type(AHc))
-    #fci_com =  v.T.conj().dot(AHc.dot(v)) 
-    ref_com =  reference_ket.T.conj().dot(AHc.dot(reference_ket)) 
-    assert(ref_com.shape == (1,1))
-    #fci_com = fci_com.real
-    ref_com = ref_com[0,0].real
-    #print("%12.8f, %12.8f" %(ref_com, fci_com))
-    #print("%12.8f" %(ref_com))
-    AHcom.append(ref_com*ref_com.conj())
+    AHcom.append(AHc)
+#    #v = fci_v[:,0]
+#    #print(v.shape, AHc.shape)
+#    #print(type(v), type(AHc))
+#    #fci_com =  v.T.conj().dot(AHc.dot(v)) 
+#    ref_com =  reference_ket.T.conj().dot(AHc.dot(reference_ket)) 
+#    assert(ref_com.shape == (1,1))
+#    #fci_com = fci_com.real
+#    ref_com = ref_com[0,0].real
+#    #print("%12.8f, %12.8f" %(ref_com, fci_com))
+#    #print("%12.8f" %(ref_com))
+#    AHcom.append(ref_com*ref_com.conj())
 #    for opBi in range(len(JW_CC_ops)):
 #        opB = JW_CC_ops[opBi]
 #        #ABHc = AHc.dot(opB)-opB.dot(AHc)
@@ -444,34 +445,10 @@ if args['filter'] == "AH":
 #distances, predecessors = dijkstra(ABHcom, return_predecessors=True)
 #print(distances)
 
-if 0:
-    D = np.zeros(N)
-    for i in range(N):
-        D[i] = np.sum(ABHcom[i,:])
-    L = np.diag(D)-ABHcom
-    L = L.real
-    [L_e, L_v] = scipy.linalg.eig(L)
-    for e in L_e:
-        assert(np.isclose(e.imag,0))
-    L_e = L_e.real
-    new_order = np.argsort(L_e)
-    L_e = L_e[new_order] 
-    L_v = L_v[:,new_order] 
-    for e in L_e:
-        print(" L Eigvalue: %12.8f" %e.real)
-    
-    new_order = np.argsort(L_v[:,1])
-    JW_CC_ops = [ JW_CC_ops[i] for i in new_order]
-    #JW_CC_ops = [ JW_CC_ops[i] for i in reversed(new_order)]
-
-    print(L)
-
-print(" Commutators [A,H]:")
-for a in AHcom:
-    print("   %12.8f" %a)
 
 parameters_save = cp.deepcopy(parameters)
 JW_CC_ops_save = cp.deepcopy(JW_CC_ops)
+SQ_CC_ops_save = cp.deepcopy(SQ_CC_ops)
 #JW_CC_ops = JW_CC_ops[0:1]
 #parameters = parameters[0:1]
 #
@@ -488,38 +465,51 @@ JW_CC_ops_save = cp.deepcopy(JW_CC_ops)
 op_indices = []
 parameters = []
 JW_CC_ops = []
+SQ_CC_ops = []
+curr_state = 1.0*reference_ket
 print(" Now start to grow the ansatz")
 for n_op in range(0,50):
     print("\n\n\n Check each new operator for coupling")
-    next_couplings = []
-    next_params = []
-    next_jw_ops = []
-    for op_trial in range(len(JW_CC_ops_save)):
-        
-        print(" Trial Operator: %5i Number of Operators: %i" %( op_trial, len(parameters)+1))
-        trial_params = cp.deepcopy(parameters)
-        trial_jw_ops = cp.deepcopy(JW_CC_ops)
-       
-        trial_params.append(0)
-        trial_jw_ops.append(JW_CC_ops_save[op_trial])
-        
-        trial_model = tUCCSD(hamiltonian,trial_jw_ops, reference_ket, trial_params)
-        opt_result = scipy.optimize.minimize(trial_model.energy, trial_params, jac=trial_model.gradient, 
-                options = {'gtol': 1e-6, 'disp':True}, method = 'BFGS', callback=trial_model.callback)
-        print(" Finished: %20.12f" % trial_model.curr_energy)
-        next_couplings.append(trial_model.curr_energy)
-        next_params.append(list(opt_result['x']))
-        next_jw_ops.append(trial_jw_ops)
+    next_com = []
+    print(" Measure commutators:")
+    for op_trial in range(len(AHcom)):
 
-    # Sort couplings ascending
-    sorted_order = np.argsort(next_couplings)
+        AHc = AHcom[op_trial]
+        com = curr_state.transpose().conj().dot(AHc.dot(curr_state))
+        assert(com.shape == (1,1))
+        com = com[0,0]
+        assert(np.isclose(com.imag,0))
+        com = com.real
+        opstring = ""
+        for t in SQ_CC_ops_save[op_trial].terms:
+            opstring += str(t)
+            break
+        print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
+        next_com.append(abs(com))
+        #print(" %i %20s %12.8f" %(op_trial, SQ_CC_ops[op_trial], com) )
     
-    update_index = sorted_order[0]
-    op_indices.append(update_index)
-    JW_CC_ops = cp.deepcopy(next_jw_ops[update_index])
-    parameters = cp.deepcopy(next_params[update_index])
-    print(" Best Energy = %12.8f " %next_couplings[update_index])
-    print(op_indices)
+    next_index = next_com.index(max(next_com))
+    print(" Add operator %4i" %next_index)
+    parameters.insert(0,0)
+    JW_CC_ops.insert(0,JW_CC_ops_save[next_index])
+    SQ_CC_ops.insert(0,SQ_CC_ops_save[next_index])
+    
+    trial_model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
+    opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
+            options = {'gtol': 1e-6, 'disp':False}, method = 'BFGS', callback=trial_model.callback)
+
+    parameters = list(opt_result['x'])
+    curr_state = trial_model.prepare_state(parameters)
+    print(" Finished: %20.12f" % trial_model.curr_energy)
+    print(" -----------New ansatz----------- ")
+    print(" %4s %40s %12s" %("#","Term","Coeff"))
+    for si in range(len(SQ_CC_ops)):
+        s = SQ_CC_ops[si]
+        opstring = ""
+        for t in s.terms:
+            opstring += str(t)
+            break
+        print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
 
 
 
