@@ -28,9 +28,9 @@ parser = argparse.ArgumentParser(description='Run VQE',
 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('-s','--seed', type=int, default=1, help='Should I use a random seed?', required=False)
-parser.add_argument('-K', type=float, default=-1, help='K(SzSz)', required=False)
-parser.add_argument('-J', type=float, default=-1, help='J(SxSx+SySy)', required=False)
-parser.add_argument('-a','--ansatz', type=str, default='ijab_spinfree', help="Which Ansatz to use",
+parser.add_argument('-r','--bond_length', type=float, default=None, help='Input parameter for bond distance scan', required=False)
+parser.add_argument('-t','--thresh', type=float, default=1e-3, help='How tightly to converge?', required=False)
+parser.add_argument('-a','--ansatz', type=str, default='pqrs', help="Which Ansatz to use",
         choices=["ijab","ijab_spinfree", "pqrs", "pqrs_spinfree", "hamiltonian"], required=False)
 parser.add_argument('--sort', type=str, default=None, help="Which Ansatz ordering to use",
         choices=["AH","AH_reversed"], required=False)
@@ -62,6 +62,10 @@ geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,
 geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1)), ('H', (0,0,7*r1)), ('H', (0,0,8*r1))]
 geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,r1,1*r1)), ('H', (0,r1,2*r1)), ('H',(0,r1,3*r1))]
 geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1))]
+
+
+rlih = 2.39 * args['bond_length']
+geometry = [('Li', (0,0,0)), ('H',(0,0,rlih))]
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
 molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=1, run_cisd=1, run_ccsd = 1, run_fci=1, delete_input=0)
 n_spinorbitals = int(molecule.n_orbitals*2)
@@ -464,6 +468,18 @@ SQ_CC_ops_save = cp.deepcopy(SQ_CC_ops)
 #for p in parameters:
 #    print(p)
 
+
+
+if args['uccsd'] == True:
+    uccsd = UCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
+    opt_result = scipy.optimize.minimize(uccsd.energy, parameters, options = {'gtol': 1e-6, 'disp':True}, method =
+            'BFGS', callback=uccsd.callback)
+    print(" Finished: %20.12f" % uccsd.curr_energy)
+    parameters = opt_result['x']
+    for p in parameters:
+        print(p)
+    exit()
+
 if args['grow'] == "AH":
     op_indices = []
     parameters = []
@@ -471,12 +487,12 @@ if args['grow'] == "AH":
     SQ_CC_ops = []
     curr_state = 1.0*reference_ket
     print(" Now start to grow the ansatz")
-    for n_op in range(0,50):
+    for n_op in range(0,200):
         print("\n\n\n Check each new operator for coupling")
         next_com = []
         print(" Measure commutators:")
         for op_trial in range(len(AHcom)):
-    
+            
             AHc = AHcom[op_trial]
             com = curr_state.transpose().conj().dot(AHc.dot(curr_state))
             assert(com.shape == (1,1))
@@ -487,11 +503,32 @@ if args['grow'] == "AH":
             for t in SQ_CC_ops_save[op_trial].terms:
                 opstring += str(t)
                 break
-            if abs(com) > 1e-8:
+            if abs(com) > args['thresh']:
                 print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
             next_com.append(abs(com))
             #print(" %i %20s %12.8f" %(op_trial, SQ_CC_ops[op_trial], com) )
         
+        
+        min_options = {'gtol': .5*args['thresh'], 'disp':False}
+      
+        norm_of_com = np.linalg.norm(np.array(next_com))
+        com = abs(com)
+        max_of_com = max(next_com)
+        print(" Norm of <[A,H]> = %12.8f" %norm_of_com)
+        print(" Max  of <[A,H]> = %12.8f" %max_of_com)
+        if max_of_com < args['thresh']:
+            print(" Ansatz Growth Converged!")
+            print(" *Finished: %20.12f" % trial_model.curr_energy)
+            print(" -----------Final ansatz----------- ")
+            print(" %4s %40s %12s" %("#","Term","Coeff"))
+            for si in range(len(SQ_CC_ops)):
+                s = SQ_CC_ops[si]
+                opstring = ""
+                for t in s.terms:
+                    opstring += str(t)
+                    break
+                print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+            break
         next_index = next_com.index(max(next_com))
         print(" Add operator %4i" %next_index)
         parameters.insert(0,0)
@@ -499,8 +536,10 @@ if args['grow'] == "AH":
         SQ_CC_ops.insert(0,SQ_CC_ops_save[next_index])
         
         trial_model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
+        
+
         opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
-                options = {'gtol': 1e-6, 'disp':False}, method = 'BFGS', callback=trial_model.callback)
+                options = min_options, method = 'BFGS', callback=trial_model.callback)
     
         parameters = list(opt_result['x'])
         curr_state = trial_model.prepare_state(parameters)
@@ -514,6 +553,7 @@ if args['grow'] == "AH":
                 opstring += str(t)
                 break
             print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+        
 
 
 
@@ -568,13 +608,5 @@ if args['grow'] == "opt1":
 
 
 
-if args['uccsd'] == True:
-    uccsd = UCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
-    opt_result = scipy.optimize.minimize(uccsd.energy, parameters, options = {'gtol': 1e-6, 'disp':True}, method =
-            'BFGS', callback=uccsd.callback)
-    print(" Finished: %20.12f" % uccsd.curr_energy)
-    parameters = opt_result['x']
-    for p in parameters:
-        print(p)
 
 
