@@ -30,6 +30,7 @@ formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-s','--seed', type=int, default=1, help='Should I use a random seed?', required=False)
 parser.add_argument('-r','--bond_length', type=float, default=None, help='Input parameter for bond distance scan', required=False)
 parser.add_argument('-t','--thresh', type=float, default=1e-3, help='How tightly to converge?', required=False)
+parser.add_argument('--max_iter', type=int, default=200, help='How many iterations (operators) to converge?', required=False)
 parser.add_argument('-a','--ansatz', type=str, default='pqrs', help="Which Ansatz to use",
         choices=["ijab","ijab_spinfree", "pqrs", "pqrs_spinfree", "hamiltonian"], required=False)
 parser.add_argument('--sort', type=str, default=None, help="Which Ansatz ordering to use",
@@ -487,7 +488,8 @@ if args['grow'] == "AH":
     SQ_CC_ops = []
     curr_state = 1.0*reference_ket
     print(" Now start to grow the ansatz")
-    for n_op in range(0,200):
+    max_iter = args['max_iter']
+    for n_op in range(0,max_iter):
         print("\n\n\n Check each new operator for coupling")
         next_com = []
         print(" Measure commutators:")
@@ -554,6 +556,7 @@ if args['grow'] == "AH":
                 opstring += str(t)
                 break
             print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+
         
 
 
