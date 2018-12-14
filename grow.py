@@ -509,7 +509,7 @@ if args['grow'] == "AH":
             #print(" %i %20s %12.8f" %(op_trial, SQ_CC_ops[op_trial], com) )
         
         
-        min_options = {'gtol': .5*args['thresh'], 'disp':False}
+        min_options = {'gtol': .1*args['thresh'], 'disp':False}
       
         norm_of_com = np.linalg.norm(np.array(next_com))
         com = abs(com)
@@ -518,6 +518,7 @@ if args['grow'] == "AH":
         print(" Max  of <[A,H]> = %12.8f" %max_of_com)
         if max_of_com < args['thresh']:
             print(" Ansatz Growth Converged!")
+            print(" Number of operators in ansatz: ", len(SQ_CC_ops))
             print(" *Finished: %20.12f" % trial_model.curr_energy)
             print(" -----------Final ansatz----------- ")
             print(" %4s %40s %12s" %("#","Term","Coeff"))
