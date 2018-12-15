@@ -76,7 +76,6 @@ geometry = [('H', (0,0,+r)), ('H', (0,0,-r)), ('H', (0,+r1,0)), ('H', (0,-r,0)),
 
 geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r)), ('H', (0,0,7*r)), ('H', (0,0,8*r))]
 geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
-geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
 molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=0, run_cisd=0, run_ccsd = 0, run_fci=1, delete_input=0)
@@ -523,7 +522,7 @@ if args['grow'] == "AH":
             #print(" %i %20s %12.8f" %(op_trial, SQ_CC_ops[op_trial], com) )
         
         
-        min_options = {'gtol': .1*args['thresh'], 'disp':False}
+        min_options = {'gtol': args['thresh']*args['thresh'], 'disp':False}
       
         norm_of_com = np.linalg.norm(np.array(next_com))
         com = abs(com)
