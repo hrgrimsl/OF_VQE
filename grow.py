@@ -39,7 +39,7 @@ parser.add_argument('--filter', type=str, default="None", help="Filter out t amp
         choices=["AH","None"], required=False)
 parser.add_argument('-g', '--grow', type=str, default="AH", help="How to grow the ansatz",
         choices=["AH","opt1"], required=False)
-parser.add_argument('-c', '--convergence', type=str, default="max", help="How to grow the ansatz",
+parser.add_argument('-c', '--convergence', type=str, default="rms", help="How to grow the ansatz",
         choices=["max","rms","max_rms"], required=False)
 parser.add_argument('--uccsd', action='store_true', help="Do un-trotterized version?", required=False)
 args = vars(parser.parse_args())
