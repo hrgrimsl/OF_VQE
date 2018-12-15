@@ -39,6 +39,8 @@ parser.add_argument('--filter', type=str, default="None", help="Filter out t amp
         choices=["AH","None"], required=False)
 parser.add_argument('-g', '--grow', type=str, default="AH", help="How to grow the ansatz",
         choices=["AH","opt1"], required=False)
+parser.add_argument('-c', '--convergence', type=str, default="max", help="How to grow the ansatz",
+        choices=["max","rms","max_rms"], required=False)
 parser.add_argument('--uccsd', action='store_true', help="Do un-trotterized version?", required=False)
 args = vars(parser.parse_args())
 
@@ -60,20 +62,30 @@ multiplicity = 1
 geometry = [('H', (0,0,1.5)),('H', (0, 0, 3)), ('H', (0,0,4.5)), ('H', (0, 0, 6))]
 r1 = 1.5
 geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1))]
-geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1)), ('H', (0,0,5*r1)), ('H', (0,0,6*r1)), ('H', (0,0,7*r1)), ('H', (0,0,8*r1))]
 geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,r1,1*r1)), ('H', (0,r1,2*r1)), ('H',(0,r1,3*r1))]
-geometry = [('H', (0,0,1*r1)), ('H', (0,0,2*r1)), ('H', (0,0,3*r1)), ('H', (0,0,4*r1))]
 
 
 rlih = 2.39 * args['bond_length']
 geometry = [('Li', (0,0,0)), ('H',(0,0,rlih))]
+
+
+r = args['bond_length']
+#octahedral
+geometry = [('H', (0,0,+r)), ('H', (0,0,-r)), ('H', (0,+r1,0)), ('H', (0,-r,0)), ('H', (+r,0,0)), ('H', (-r,0,0))]
+
+
+geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r)), ('H', (0,0,7*r)), ('H', (0,0,8*r))]
+geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
+geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
+
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
-molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=1, run_cisd=1, run_ccsd = 1, run_fci=1, delete_input=0)
+molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=0, run_cisd=0, run_ccsd = 0, run_fci=1, delete_input=0)
+#molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=1, run_cisd=1, run_ccsd = 1, run_fci=1, delete_input=0)
 n_spinorbitals = int(molecule.n_orbitals*2)
 print('HF energy      %20.16f au' %(molecule.hf_energy))
-print('MP2 energy     %20.16f au' %(molecule.mp2_energy))
-print('CISD energy    %20.16f au' %(molecule.cisd_energy))
-print('CCSD energy    %20.16f au' %(molecule.ccsd_energy))
+#print('MP2 energy     %20.16f au' %(molecule.mp2_energy))
+#print('CISD energy    %20.16f au' %(molecule.cisd_energy))
+#print('CCSD energy    %20.16f au' %(molecule.ccsd_energy))
 print('FCI energy     %20.16f au' %(molecule.fci_energy))
 
 
@@ -518,7 +530,19 @@ if args['grow'] == "AH":
         max_of_com = max(next_com)
         print(" Norm of <[A,H]> = %12.8f" %norm_of_com)
         print(" Max  of <[A,H]> = %12.8f" %max_of_com)
-        if max_of_com < args['thresh']:
+
+        converged = False
+        if args['convergence'] == "max":
+            if max_of_com < args['thresh']:
+                converged = True
+        elif args['convergence'] == "rms":
+            if norm_of_com < args['thresh']:
+                converged = True
+        else:
+            print(" Convergence criterion not specified")
+            exit()
+
+        if converged:
             print(" Ansatz Growth Converged!")
             print(" Number of operators in ansatz: ", len(SQ_CC_ops))
             print(" *Finished: %20.12f" % trial_model.curr_energy)
