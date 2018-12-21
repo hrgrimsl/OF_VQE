@@ -72,6 +72,7 @@ geometry = [('H', (0,0,+r)), ('H', (0,0,-r)), ('H', (0,+r1,0)), ('H', (0,-r,0)),
 
 geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r)), ('H', (0,0,7*r)), ('H', (0,0,8*r))]
 
+geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
 
 
@@ -83,7 +84,6 @@ geometry = [('H', (0,0,-rbeh2)), ('Be', (0,0,0)), ('H', (0,0,rbeh2))]
 rlih = 2.39 * args['bond_length']
 geometry = [('Li', (0,0,0)), ('H',(0,0,rlih))]
 
-geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
 molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=0, run_cisd=0, run_ccsd = 0, run_fci=1, delete_input=0)
@@ -415,7 +415,8 @@ print(" Number of parameters: ", len(parameters))
 JW_CC_ops = []
 for classical_op in SQ_CC_ops:
     JW_CC_ops.append(openfermion.transforms.get_sparse_operator(classical_op, n_qubits = molecule.n_qubits))
-
+op_pool = cp.deepcopy(JW_CC_ops)
+n_op_pool = len(op_pool)
 
 
 #[fci_e, fci_v] = scipy.sparse.linalg.eigs(hamiltonian,1)
@@ -540,9 +541,9 @@ if args['grow'] == "AH":
         next_com = []
         print(" Measure commutators:")
         sig = hamiltonian.dot(curr_state)
-        for op_trial in range(len(JW_CC_ops)):
+        for op_trial in range(len(op_pool)):
             
-            opA = JW_CC_ops[op_trial]
+            opA = op_pool[op_trial]
             com = 2*(curr_state.transpose().conj().dot(opA.dot(sig))).real
             assert(com.shape == (1,1))
             com = com[0,0]
