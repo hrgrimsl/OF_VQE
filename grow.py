@@ -39,8 +39,8 @@ parser.add_argument('--filter', type=str, default="None", help="Filter out t amp
         choices=["AH","None"], required=False)
 parser.add_argument('-g', '--grow', type=str, default="AH", help="How to grow the ansatz",
         choices=["AH","opt1"], required=False)
-parser.add_argument('-c', '--convergence', type=str, default="rms", help="How to grow the ansatz",
-        choices=["max","rms","max_rms"], required=False)
+parser.add_argument('-c', '--convergence', type=str, default="norm", help="How to decide with the ansatz is converged",
+        choices=["max","rms","norm"], required=False)
 parser.add_argument('--uccsd', action='store_true', help="Do un-trotterized version?", required=False)
 parser.add_argument('--spin_adapt', action='store_true', help="Spin adapt excitation operators?", required=False)
 args = vars(parser.parse_args())
@@ -72,13 +72,18 @@ geometry = [('H', (0,0,+r)), ('H', (0,0,-r)), ('H', (0,+r1,0)), ('H', (0,-r,0)),
 
 geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r)), ('H', (0,0,7*r)), ('H', (0,0,8*r))]
 
-geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
+
+
+geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
+
+rbeh2 = 1.342 * args['bond_length']
+geometry = [('H', (0,0,-rbeh2)), ('Be', (0,0,0)), ('H', (0,0,rbeh2))]
 
 rlih = 2.39 * args['bond_length']
 geometry = [('Li', (0,0,0)), ('H',(0,0,rlih))]
 
-geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
+geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
 molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=0, run_cisd=0, run_ccsd = 0, run_fci=1, delete_input=0)
@@ -401,8 +406,8 @@ if do_shuffle:
     singles = [ singles[i] for i in order]
 SQ_CC_ops.extend(singles)
 
-for op in SQ_CC_ops:
-    print(op)
+#for op in SQ_CC_ops:
+#    print(op)
 
 
 print(" Number of parameters: ", len(parameters))
@@ -415,35 +420,38 @@ for classical_op in SQ_CC_ops:
 
 #[fci_e, fci_v] = scipy.sparse.linalg.eigs(hamiltonian,1)
 #print(" FCI energy: %12.8f" %fci_e[0])
-print(" Build commutators <[A,H]>:")
-AHcom = []
-ABHcom = np.zeros((len(JW_CC_ops), len(JW_CC_ops)))
-for opAi in range(len(JW_CC_ops)):
-    opA = JW_CC_ops[opAi]
-    AHc = hamiltonian.dot(opA) - opA.dot(hamiltonian)
-    AHcom.append(AHc)
-#    #v = fci_v[:,0]
-#    #print(v.shape, AHc.shape)
-#    #print(type(v), type(AHc))
-#    #fci_com =  v.T.conj().dot(AHc.dot(v)) 
-#    ref_com =  reference_ket.T.conj().dot(AHc.dot(reference_ket)) 
-#    assert(ref_com.shape == (1,1))
-#    #fci_com = fci_com.real
-#    ref_com = ref_com[0,0].real
-#    #print("%12.8f, %12.8f" %(ref_com, fci_com))
-#    #print("%12.8f" %(ref_com))
-#    AHcom.append(ref_com*ref_com.conj())
-#    for opBi in range(len(JW_CC_ops)):
-#        opB = JW_CC_ops[opBi]
-#        #ABHc = AHc.dot(opB)-opB.dot(AHc)
-#        ABHc = opA.dot(opB)-opB.dot(opA)
-#        ABHc = ABHc.dot(hamiltonian)-hamiltonian.dot(ABHc)
-#        ref_com =  reference_ket.T.conj().dot(ABHc.dot(reference_ket)) 
-#        assert(ref_com.shape == (1,1))
-#        ref_com = ref_com[0,0].real
-#        print("     %12.8f" %(ref_com))
-#        ABHcom[opAi,opBi] = ref_com*ref_com
-##        ABHcom[opBi,opAi] = ref_com*ref_com
+
+precompute_AH_com = False
+if precompute_AH_com:
+    print(" Build commutators <[A,H]>:")
+    AHcom = []
+    ABHcom = np.zeros((len(JW_CC_ops), len(JW_CC_ops)))
+    for opAi in range(len(JW_CC_ops)):
+        opA = JW_CC_ops[opAi]
+        AHc = hamiltonian.dot(opA) - opA.dot(hamiltonian)
+        AHcom.append(AHc)
+    #    #v = fci_v[:,0]
+    #    #print(v.shape, AHc.shape)
+    #    #print(type(v), type(AHc))
+    #    #fci_com =  v.T.conj().dot(AHc.dot(v)) 
+    #    ref_com =  reference_ket.T.conj().dot(AHc.dot(reference_ket)) 
+    #    assert(ref_com.shape == (1,1))
+    #    #fci_com = fci_com.real
+    #    ref_com = ref_com[0,0].real
+    #    #print("%12.8f, %12.8f" %(ref_com, fci_com))
+    #    #print("%12.8f" %(ref_com))
+    #    AHcom.append(ref_com*ref_com.conj())
+    #    for opBi in range(len(JW_CC_ops)):
+    #        opB = JW_CC_ops[opBi]
+    #        #ABHc = AHc.dot(opB)-opB.dot(AHc)
+    #        ABHc = opA.dot(opB)-opB.dot(opA)
+    #        ABHc = ABHc.dot(hamiltonian)-hamiltonian.dot(ABHc)
+    #        ref_com =  reference_ket.T.conj().dot(ABHc.dot(reference_ket)) 
+    #        assert(ref_com.shape == (1,1))
+    #        ref_com = ref_com[0,0].real
+    #        print("     %12.8f" %(ref_com))
+    #        ABHcom[opAi,opBi] = ref_com*ref_com
+    ##        ABHcom[opBi,opAi] = ref_com*ref_com
 
 N = len(JW_CC_ops)
 
@@ -464,31 +472,31 @@ N = len(JW_CC_ops)
 
 
     
-if args['sort'] == "AH":
-    new_order = np.argsort(AHcom)
-    JW_CC_ops = [ JW_CC_ops[i] for i in new_order]
-    AHcom = [ AHcom[i] for i in new_order]
-elif args['sort'] == "AH_reversed":
-    new_order = np.argsort(AHcom)[::-1]
-    JW_CC_ops = [ JW_CC_ops[i] for i in new_order]
-    AHcom = [ AHcom[i] for i in new_order]
-
-if args['filter'] == "AH":
-    print("Filter out t amplitudes based on size of <[A,H]>")
-    new_ops = []
-    new_par = []
-    new_AH  = []
-    for c in range(len(AHcom)):
-        if abs(AHcom[c]) > 1e-8:
-            new_ops.append(JW_CC_ops[c])
-            new_par.append(parameters[c])
-            new_AH.append(AHcom[c])
-    parameters = new_par
-    JW_CC_ops = new_ops
-    AHcom = new_AH
-    print('New number of parameters: ', len(JW_CC_ops))
-#distances, predecessors = dijkstra(ABHcom, return_predecessors=True)
-#print(distances)
+#if args['sort'] == "AH":
+#    new_order = np.argsort(AHcom)
+#    JW_CC_ops = [ JW_CC_ops[i] for i in new_order]
+#    AHcom = [ AHcom[i] for i in new_order]
+#elif args['sort'] == "AH_reversed":
+#    new_order = np.argsort(AHcom)[::-1]
+#    JW_CC_ops = [ JW_CC_ops[i] for i in new_order]
+#    AHcom = [ AHcom[i] for i in new_order]
+#
+#if args['filter'] == "AH":
+#    print("Filter out t amplitudes based on size of <[A,H]>")
+#    new_ops = []
+#    new_par = []
+#    new_AH  = []
+#    for c in range(len(AHcom)):
+#        if abs(AHcom[c]) > 1e-8:
+#            new_ops.append(JW_CC_ops[c])
+#            new_par.append(parameters[c])
+#            new_AH.append(AHcom[c])
+#    parameters = new_par
+#    JW_CC_ops = new_ops
+#    AHcom = new_AH
+#    print('New number of parameters: ', len(JW_CC_ops))
+##distances, predecessors = dijkstra(ABHcom, return_predecessors=True)
+##print(distances)
 
 
 parameters_save = cp.deepcopy(parameters)
@@ -531,10 +539,11 @@ if args['grow'] == "AH":
         print("\n\n\n Check each new operator for coupling")
         next_com = []
         print(" Measure commutators:")
-        for op_trial in range(len(AHcom)):
+        sig = hamiltonian.dot(curr_state)
+        for op_trial in range(len(JW_CC_ops)):
             
-            AHc = AHcom[op_trial]
-            com = curr_state.transpose().conj().dot(AHc.dot(curr_state))
+            opA = JW_CC_ops[op_trial]
+            com = 2*(curr_state.transpose().conj().dot(opA.dot(sig))).real
             assert(com.shape == (1,1))
             com = com[0,0]
             assert(np.isclose(com.imag,0))
@@ -550,19 +559,27 @@ if args['grow'] == "AH":
         
         
         min_options = {'gtol': 1e-6, 'disp':False}
-      
+     
+        sqrd = []
+        for i in next_com:
+            sqrd.append(i*i)
         norm_of_com = np.linalg.norm(np.array(next_com))
+        rms_of_com = np.sqrt(np.mean(next_com))
         com = abs(com)
         max_of_com = max(next_com)
         print(" Norm of <[A,H]> = %12.8f" %norm_of_com)
         print(" Max  of <[A,H]> = %12.8f" %max_of_com)
+        print(" RMS  of <[A,H]> = %12.8f" %rms_of_com)
 
         converged = False
         if args['convergence'] == "max":
             if max_of_com < args['thresh']:
                 converged = True
-        elif args['convergence'] == "rms":
+        elif args['convergence'] == "norm":
             if norm_of_com < args['thresh']:
+                converged = True
+        elif args['convergence'] == "rms":
+            if rms_of_com < args['thresh']:
                 converged = True
         else:
             print(" Convergence criterion not specified")
