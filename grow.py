@@ -38,7 +38,7 @@ parser.add_argument('--sort', type=str, default=None, help="Which Ansatz orderin
 parser.add_argument('--filter', type=str, default="None", help="Filter out t amplitudes based on a criterion",
         choices=["AH","None"], required=False)
 parser.add_argument('-g', '--grow', type=str, default="AH", help="How to grow the ansatz",
-        choices=["AH","opt1"], required=False)
+        choices=["AH","opt1","random",'lexical'], required=False)
 parser.add_argument('-c', '--convergence', type=str, default="norm", help="How to decide with the ansatz is converged",
         choices=["max","rms","norm"], required=False)
 parser.add_argument('--uccsd', action='store_true', help="Do un-trotterized version?", required=False)
@@ -78,12 +78,11 @@ geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r
 
 geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
 
-rbeh2 = 1.342 * args['bond_length']
-geometry = [('H', (0,0,-rbeh2)), ('Be', (0,0,0)), ('H', (0,0,rbeh2))]
-
 rlih = 2.39 * args['bond_length']
 geometry = [('Li', (0,0,0)), ('H',(0,0,rlih))]
 
+rbeh2 = 1.342 * args['bond_length']
+geometry = [('H', (0,0,-rbeh2)), ('Be', (0,0,0)), ('H', (0,0,rbeh2))]
 
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
 molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=0, run_cisd=0, run_ccsd = 0, run_fci=1, delete_input=0)
@@ -609,6 +608,83 @@ if args['grow'] == "AH":
         trial_model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
         
 
+        opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
+                options = min_options, method = 'BFGS', callback=trial_model.callback)
+    
+        parameters = list(opt_result['x'])
+        curr_state = trial_model.prepare_state(parameters)
+        print(" Finished: %20.12f" % trial_model.curr_energy)
+        print(" -----------New ansatz----------- ")
+        print(" %4s %40s %12s" %("#","Term","Coeff"))
+        for si in range(len(SQ_CC_ops)):
+            s = SQ_CC_ops[si]
+            opstring = ""
+            for t in s.terms:
+                opstring += str(t)
+                break
+            print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+
+        
+
+
+if args['grow'] == "random":
+    op_indices = []
+    parameters = []
+    JW_CC_ops = []
+    SQ_CC_ops = []
+    curr_state = 1.0*reference_ket
+    print(" Now start to grow the ansatz")
+    max_iter = args['max_iter']
+    for n_op in range(0,max_iter):
+        print("\n\n\n Check each new operator for coupling")
+        next_index = random.randrange(len(op_pool))
+
+        print(" Add operator %4i" %next_index)
+        parameters.insert(0,0)
+        JW_CC_ops.insert(0,JW_CC_ops_save[next_index])
+        SQ_CC_ops.insert(0,SQ_CC_ops_save[next_index])
+        
+        trial_model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
+        
+
+        min_options = {'gtol': 1e-6, 'disp':False}
+        opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
+                options = min_options, method = 'BFGS', callback=trial_model.callback)
+    
+        parameters = list(opt_result['x'])
+        curr_state = trial_model.prepare_state(parameters)
+        print(" Finished: %20.12f" % trial_model.curr_energy)
+        print(" -----------New ansatz----------- ")
+        print(" %4s %40s %12s" %("#","Term","Coeff"))
+        for si in range(len(SQ_CC_ops)):
+            s = SQ_CC_ops[si]
+            opstring = ""
+            for t in s.terms:
+                opstring += str(t)
+                break
+            print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+
+if args['grow'] == "lexical":
+    op_indices = []
+    parameters = []
+    JW_CC_ops = []
+    SQ_CC_ops = []
+    curr_state = 1.0*reference_ket
+    print(" Now start to grow the ansatz")
+    max_iter = args['max_iter']
+    for n_op in range(0,max_iter):
+        print("\n\n\n Check each new operator for coupling")
+
+        next_index = n_op % len(op_pool) 
+        print(" Add operator %4i" %next_index)
+        parameters.insert(0,0)
+        JW_CC_ops.insert(0,JW_CC_ops_save[next_index])
+        SQ_CC_ops.insert(0,SQ_CC_ops_save[next_index])
+        
+        trial_model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
+        
+
+        min_options = {'gtol': 1e-6, 'disp':False}
         opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
                 options = min_options, method = 'BFGS', callback=trial_model.callback)
     
