@@ -38,7 +38,7 @@ parser.add_argument('--sort', type=str, default=None, help="Which Ansatz orderin
 parser.add_argument('--filter', type=str, default="None", help="Filter out t amplitudes based on a criterion",
         choices=["AH","None"], required=False)
 parser.add_argument('-g', '--grow', type=str, default="AH", help="How to grow the ansatz",
-        choices=["AH","opt1","random",'lexical'], required=False)
+        choices=["AH","opt1","random",'lexical','newton'], required=False)
 parser.add_argument('-c', '--convergence', type=str, default="norm", help="How to decide with the ansatz is converged",
         choices=["max","rms","norm"], required=False)
 parser.add_argument('--uccsd', action='store_true', help="Do un-trotterized version?", required=False)
@@ -76,13 +76,14 @@ geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r
 
 
 
-geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
+rbeh2 = 1.342 * args['bond_length']
+geometry = [('H', (0,0,-rbeh2)), ('Be', (0,0,0)), ('H', (0,0,rbeh2))]
 
 rlih = 2.39 * args['bond_length']
 geometry = [('Li', (0,0,0)), ('H',(0,0,rlih))]
 
-rbeh2 = 1.342 * args['bond_length']
-geometry = [('H', (0,0,-rbeh2)), ('Be', (0,0,0)), ('H', (0,0,rbeh2))]
+geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
+
 
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
 molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=0, run_cisd=0, run_ccsd = 0, run_fci=1, delete_input=0)
@@ -607,6 +608,143 @@ if args['grow'] == "AH":
         
         trial_model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
         
+
+        opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
+                options = min_options, method = 'BFGS', callback=trial_model.callback)
+    
+        parameters = list(opt_result['x'])
+        curr_state = trial_model.prepare_state(parameters)
+        print(" Finished: %20.12f" % trial_model.curr_energy)
+        print(" -----------New ansatz----------- ")
+        print(" %4s %40s %12s" %("#","Term","Coeff"))
+        for si in range(len(SQ_CC_ops)):
+            s = SQ_CC_ops[si]
+            opstring = ""
+            for t in s.terms:
+                opstring += str(t)
+                break
+            print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+
+        
+
+
+if args['grow'] == "newton":
+    op_indices = []
+    parameters = []
+    JW_CC_ops = []
+    SQ_CC_ops = []
+    curr_state = 1.0*reference_ket
+    print(" Now start to grow the ansatz")
+    max_iter = args['max_iter']
+    for n_op in range(0,max_iter):
+        print("\n\n\n Check each new operator for coupling")
+        next_deriv = []
+        next_echange = []
+        #next_deriv2 = []
+        print(" Measure derivatives:")
+        Hpsi = hamiltonian.dot(curr_state)
+        Ecurr = curr_state.transpose().conj().dot(Hpsi)[0,0].real
+        H = hamiltonian
+        for op_trial in range(len(op_pool)):
+           
+            opA = op_pool[op_trial]
+            Apsi = opA.dot(curr_state)
+
+            # f'[x]  = 2R <HA>
+            # f''[x] = 2R <HAA> - 2<AHA>
+            
+            fd1 = 2*(Hpsi.transpose().conj().dot(Apsi)).real
+            fd2 = 2*(Hpsi.transpose().conj().dot(opA.dot(Apsi))).real + 2*Apsi.conj().transpose().dot(H.dot(Apsi))
+            assert(fd1.shape == (1,1))
+            assert(fd2.shape == (1,1))
+            fd1 = fd1[0,0]
+            fd2 = fd2[0,0]
+            assert(np.isclose(fd1.imag,0))
+            assert(np.isclose(fd2.imag,0))
+            fd1 = fd1.real
+            fd2 = fd2.real
+  
+            echange = 0
+            if fd1 > 1e-8:
+                if fd2 > 1e-12 or fd2 < -1e-12:
+                    echange = -.5*fd1*fd1/fd2
+            next_echange.append(echange)
+            opstring = ""
+            for t in SQ_CC_ops_save[op_trial].terms:
+                opstring += str(t)
+                break
+            if abs(fd1) > args['thresh']:
+                print(" %4i %40s 1st Deriv %12.8f 2nd Deriv %12.8f Predicted Energy change %12.8f" %(op_trial, opstring,
+                    fd1, fd2, echange) )
+            next_deriv.append(abs(fd1))
+            #next_deriv2.append(abs(fd2))
+        
+        
+        min_options = {'gtol': 1e-6, 'disp':False}
+     
+        sqrd = []
+        for i in next_deriv:
+            sqrd.append(i*i)
+        norm_of_deriv = np.linalg.norm(np.array(next_deriv))
+        rms_of_deriv = np.sqrt(np.mean(next_deriv))
+        fd1 = abs(fd1)
+        max_of_deriv = max(next_deriv)
+        print(" Norm of <[A,H]> = %12.8f" %norm_of_deriv)
+        print(" Max  of <[A,H]> = %12.8f" %max_of_deriv)
+        print(" RMS  of <[A,H]> = %12.8f" %rms_of_deriv)
+        print(" Estimate for final energy = %12.8f" %(Ecurr + sum(next_echange)))
+
+        converged = False
+        if args['convergence'] == "max":
+            if max_of_deriv < args['thresh']:
+                converged = True
+        elif args['convergence'] == "norm":
+            if norm_of_deriv < args['thresh']:
+                converged = True
+        elif args['convergence'] == "rms":
+            if rms_of_deriv < args['thresh']:
+                converged = True
+        else:
+            print(" Convergence criterion not specified")
+            exit()
+
+        if converged:
+            print(" Ansatz Growth Converged!")
+            print(" Number of operators in ansatz: ", len(SQ_CC_ops))
+            print(" *Finished: %20.12f" % trial_model.curr_energy)
+            print(" -----------Final ansatz----------- ")
+            print(" %4s %40s %12s" %("#","Term","Coeff"))
+            for si in range(len(SQ_CC_ops)):
+                s = SQ_CC_ops[si]
+                opstring = ""
+                for t in s.terms:
+                    opstring += str(t)
+                    break
+                print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+            break
+        next_index = next_echange.index(min(next_echange))
+        #next_index = next_deriv.index(max(next_deriv))
+        print(" Add operator %4i" %next_index)
+        parameters.insert(0,0)
+        JW_CC_ops.insert(0,JW_CC_ops_save[next_index])
+        SQ_CC_ops.insert(0,SQ_CC_ops_save[next_index])
+       
+        trial_model = tUCCSD(hamiltonian,JW_CC_ops, reference_ket, parameters)
+
+        ## double check derivatives with numerical
+        #params_p = cp.deepcopy(parameters)
+        #params_m = cp.deepcopy(parameters)
+        #stepsize = 1e-5
+        #params_p[0] += stepsize
+        #params_m[0] -= stepsize
+        #ep = trial_model.energy(params_p) 
+        #e0 = trial_model.energy(parameters)
+        #em = trial_model.energy(params_m)
+        #d1 = (ep-em)/(2*stepsize)
+        #d2 = (ep-2*e0+em)/(stepsize*stepsize)
+        #print( ep, em)
+        #print( "Compare 1st derivatives: %12.8f %12.8f" %(next_deriv[next_index], d1))
+        #print( "Compare 2nd derivatives: %12.8f %12.8f" %(next_deriv2[next_index], d2))
 
         opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
                 options = min_options, method = 'BFGS', callback=trial_model.callback)
