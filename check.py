@@ -184,27 +184,43 @@ for p in range(n_spat_orbs):
     nb += pnb
 print(" Na/Nb = %4f/%4f" %(na,nb))
 
+norb1 = 6
+norb2 = 6
 v = fci_gs.todense()
-v.shape = (64,64)
+v.shape = (2**norb1,2**norb2)
+
+size_hilb1 = 2**norb1
+size_hilb2 = 2**norb2
 
 print(" Form subspace number operators")
-ss_na = np.zeros((64,64),dtype=complex)
-ss_nb = np.zeros((64,64),dtype=complex)
-for p in range(3):
+ss_na = np.zeros((size_hilb1, size_hilb1),dtype=complex)
+ss_nb = np.zeros((size_hilb1, size_hilb1),dtype=complex)
+for p in range(int(norb1/2)):
     fopa = openfermion.FermionOperator(((2*p,1),(2*p,0)))
     fopb = openfermion.FermionOperator(((2*p+1,1),(2*p+1,0)))
-    ss_na += openfermion.transforms.get_sparse_operator(fopa, n_qubits = 6).todense()
-    ss_nb += openfermion.transforms.get_sparse_operator(fopb, n_qubits = 6).todense()
+    ss_na += openfermion.transforms.get_sparse_operator(fopa, n_qubits = norb1).todense()
+    ss_nb += openfermion.transforms.get_sparse_operator(fopb, n_qubits = norb1).todense()
 
 
 print(" Singular values of FCI state")
 U,s,V = np.linalg.svd(v,full_matrices=True)
 
+
+projected_state = U[:,0].dot(V[0,:])
+projected_state.shape = (size_hilb1*size_hilb2,1)
+print(projected_state.shape)
+projected_state = scipy.sparse.csc_matrix(projected_state)
+print(" Energy of unentangled state: %12.8f"
+        %projected_state.conj().transpose().dot(hamiltonian.dot(projected_state))[0,0].real)
+
+print(" Electron counts for basis states")
 for si in range(ss_na.shape[0]):
-    print(" %12.8f %12.8f" %(ss_na.diagonal()[si], U[si,0]))
+    print(" Na = %12.8f Nb = %12.8f pc coeff = %12.8f%+12.8fj " %(ss_na.diagonal()[si].real, ss_nb.diagonal()[si].real,
+        U[si,0].real, U[si,0].imag))
 
 #print( U[:,0].conj().T.dot(U[:,0]))
 
+print("      Singular Value        Na                Nb")
 for i in range(len(s)):
     ui = U[:,i]
     #print(ui)
@@ -217,6 +233,7 @@ for i in range(len(s)):
     nai = nai.real
     nbi = nbi.real
     print(" %4i = %12.8f Na = %12.8f Nb = %12.8f" %(i,s[i], nai, nbi))
+
 
 exit()
 
