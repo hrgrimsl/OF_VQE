@@ -48,8 +48,8 @@ parser.add_argument('--spin_adapt', action='store_true', help="Spin adapt excita
 args = vars(parser.parse_args())
 
 
-pool = operator_pools.singlet_SD(2,2)
-#operator_pools.singlet_GSD(10)
+#pool = operator_pools.singlet_SD(2,2)
+pool = operator_pools.singlet_GSD(4)
 
 #JW transform Hamiltonian computed classically with OFPsi4
 
@@ -412,8 +412,10 @@ if do_shuffle:
     singles = [ singles[i] for i in order]
 SQ_CC_ops.extend(singles)
 
-SQ_CC_ops = cp.deepcopy(pool)
-parameters = [0]*len(SQ_CC_ops) 
+#SQ_CC_ops = cp.deepcopy(pool)
+#parameters = [0]*len(SQ_CC_ops) 
+
+
 #for op in SQ_CC_ops:
 #    print(op)
 
