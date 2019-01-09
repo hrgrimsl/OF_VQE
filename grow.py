@@ -14,6 +14,8 @@ import qubit
 from lib import Hamiltonian
 from lib import ci_string 
 
+import operator_pools
+
 from qubit import *
 from tVQE import *
 
@@ -46,6 +48,8 @@ parser.add_argument('--spin_adapt', action='store_true', help="Spin adapt excita
 args = vars(parser.parse_args())
 
 
+pool = operator_pools.singlet_SD(2,2)
+#operator_pools.singlet_GSD(10)
 
 #JW transform Hamiltonian computed classically with OFPsi4
 
@@ -72,18 +76,18 @@ geometry = [('H', (0,0,+r)), ('H', (0,0,-r)), ('H', (0,+r1,0)), ('H', (0,-r,0)),
 
 geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r)), ('H', (0,0,7*r)), ('H', (0,0,8*r))]
 
-geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
 
 
 rbeh2 = 1.342 * args['bond_length']
 geometry = [('H', (0,0,-rbeh2)), ('Be', (0,0,0)), ('H', (0,0,rbeh2))]
 
+geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
+
 rlih = 2.39 * args['bond_length']
 geometry = [('Li', (0,0,0)), ('H',(0,0,rlih))]
 
-geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
-
+geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
 molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
 molecule = openfermionpsi4.run_psi4(molecule, run_scf = 1, run_mp2=0, run_cisd=0, run_ccsd = 0, run_fci=1, delete_input=0)
@@ -142,6 +146,8 @@ Count t2 second-quantized operations, add a parameter for each one, and add each
 #ansatz_type = "ijab_spinfree"
 
 ansatz_type = args['ansatz']
+
+n_spat_orbs = int(n_spinorbitals/2)
 
 if ansatz_type == "ijab":
     for i in alpha_occ:
@@ -406,6 +412,8 @@ if do_shuffle:
     singles = [ singles[i] for i in order]
 SQ_CC_ops.extend(singles)
 
+SQ_CC_ops = cp.deepcopy(pool)
+parameters = [0]*len(SQ_CC_ops) 
 #for op in SQ_CC_ops:
 #    print(op)
 
