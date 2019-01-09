@@ -48,9 +48,6 @@ parser.add_argument('--spin_adapt', action='store_true', help="Spin adapt excita
 args = vars(parser.parse_args())
 
 
-#pool = operator_pools.singlet_SD(2,2)
-pool = operator_pools.singlet_GSD(4)
-
 #JW transform Hamiltonian computed classically with OFPsi4
 
 
@@ -136,6 +133,11 @@ beta_vir = beta_orbs[n_beta::]
 print(alpha_occ, alpha_vir)
 print(beta_occ, beta_vir)
 
+
+#pool = operator_pools.singlet_SD(2,2)
+pool = operator_pools.singlet_GSD()
+pool.init(mol)
+pool.generate_SQ_Operators()
 
 '''
 Count t2 second-quantized operations, add a parameter for each one, and add each one to the list
