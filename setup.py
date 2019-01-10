@@ -10,21 +10,26 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 from setuptools import setup, find_packages
+#from distutils.core import setup
 
 # Read in requirements.txt
 requirements = open('requirements.txt').readlines()
 requirements = [r.strip() for r in requirements]
 
+
 setup(name='of-adapt-vqe',
-      version=0,
-      description='Run ADAPT-VQE with Psi4 and Openfermion',
-      url='https://github.com/hrgrimsl/OF_VQE.git',
-      author='Harper R. Grimsley, Nick Mayhall',
-      author_email='hrgrimsl@vt.edu',
-      license='Apache 2',
-      install_requires=["requirements"],
-      packages=find_packages(where='src'),
-      package_dir={'': 'src'},
-      include_package_data=True,
-    )
+        version=0,
+        description='Run ADAPT-VQE with Psi4 and Openfermion',
+        url='https://github.com/hrgrimsl/OF_VQE.git',
+        author='Harper R. Grimsley, Nick Mayhall',
+        author_email='hrgrimsl@vt.edu',
+        license='Apache 2',
+        #packages=find_packages(where='src'),
+        package_dir={'': 'src'},
+        packages=[''],
+
+        #packages=setuptools.find_packages(),
+        install_requires=requirements,
+        include_package_data=True,
+        )
 
