@@ -28,6 +28,7 @@ class OperatorPool:
         
         self.n_occ = self.n_occ_a
         self.n_vir = self.n_vir_a
+        self.n_ops = 0
 
         self.generate_SQ_Operators()
 
@@ -36,9 +37,12 @@ class OperatorPool:
         exit()
 
     def generate_SparseMatrix(self):
-        print("Virtual: Reimplement")
-        exit()
-
+        self.spmat_ops = []
+        print(" Generate Sparse Matrices for operators in pool")
+        for op in self.fermi_ops:
+            self.spmat_ops.append(transforms.get_sparse_operator(op, n_qubits = self.n_spin_orb))
+        assert(len(self.spmat_ops) == self.n_ops)
+        return
 
 
 class singlet_GSD(OperatorPool):
@@ -77,7 +81,6 @@ class singlet_GSD(OperatorPool):
                     self.fermi_ops.append(termA)
                        
       
-        print("Singles: ", len(self.fermi_ops))
         pq = 0
         for p in range(0,self.n_orb):
             pa = 2*p
@@ -121,10 +124,6 @@ class singlet_GSD(OperatorPool):
                         termA = normal_ordered(termA)
                         termB = normal_ordered(termB)
                         
-                        print()
-                        print(p,q,r,s)
-                        print(termA.many_body_order())
-                        print(termA)
                         #Normalize
                         coeffA = 0
                         coeffB = 0
@@ -143,6 +142,9 @@ class singlet_GSD(OperatorPool):
                         if termB.many_body_order() > 0:
                             termB = termB/np.sqrt(coeffB)
                             self.fermi_ops.append(termB)
+
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of operators: ", self.n_ops)
         return 
 
 
@@ -239,6 +241,9 @@ class singlet_SD(OperatorPool):
                         if termB.many_body_order() > 0:
                             termB = termB/np.sqrt(coeffB)
                             self.fermi_ops.append(termB)
+        
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of operators: ", self.n_ops)
         return 
 
 
