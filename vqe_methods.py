@@ -167,6 +167,61 @@ def adapt_vqe(geometry,
 
 
 
+def ucc(geometry,
+        basis           = "sto-3g",
+        multiplicity    = 1,
+        charge          = 1,
+        theta_thresh    = 1e-7,
+        pool            = operator_pools.singlet_GSD(),
+        spin_adapt      = True,
+        psi4_filename   = "psi4_%12.12f"%random.random()
+        ):
+
+
+    molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
+    molecule.filename = psi4_filename
+    molecule = openfermionpsi4.run_psi4(molecule, 
+                run_scf = 1, 
+                run_mp2=1, 
+                run_cisd=0, 
+                run_ccsd = 0, 
+                run_fci=1, 
+                delete_input=1)
+    pool.init(molecule)
+    print(" Basis: ", basis)
+
+    print(' HF energy      %20.16f au' %(molecule.hf_energy))
+    print(' MP2 energy     %20.16f au' %(molecule.mp2_energy))
+    #print(' CISD energy    %20.16f au' %(molecule.cisd_energy))
+    #print(' CCSD energy    %20.16f au' %(molecule.ccsd_energy))
+    print(' FCI energy     %20.16f au' %(molecule.fci_energy))
+
+    #Build p-h reference and map it to JW transform
+    reference_ket = scipy.sparse.csc_matrix(
+            openfermion.jw_configuration_state(
+                list(range(0,molecule.n_electrons)), molecule.n_qubits)).transpose()
+    reference_bra = reference_ket.transpose().conj()
+
+    #JW transform Hamiltonian computed classically with OFPsi4
+    hamiltonian_op = molecule.get_molecular_hamiltonian()
+    hamiltonian = openfermion.transforms.get_sparse_operator(hamiltonian_op)
+
+    #Thetas
+    parameters = [0]*pool.n_ops 
+
+    pool.generate_SparseMatrix()
+    
+    ucc = UCC(hamiltonian, pool.spmat_ops, reference_ket, parameters)
+    
+    opt_result = scipy.optimize.minimize(ucc.energy, 
+                parameters, options = {'gtol': 1e-6, 'disp':True}, 
+                method = 'BFGS', callback=ucc.callback)
+    print(" Finished: %20.12f" % ucc.curr_energy)
+    parameters = opt_result['x']
+    for p in parameters:
+        print(p)
+
+
 
 
 
@@ -174,5 +229,6 @@ if __name__== "__main__":
     r = 1.5
     geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
-    vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_SD())
-    vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_GSD())
+    vqe_methods.ucc(geometry,pool = operator_pools.singlet_SD())
+    #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_SD())
+    #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_GSD())

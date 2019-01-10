@@ -113,7 +113,7 @@ class tUCCSD(Variational_Ansatz):
 
 
 
-class UCCSD(Variational_Ansatz):
+class UCC(Variational_Ansatz):
     
     def energy(self,params):
         new_state = self.prepare_state(params)
