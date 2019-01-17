@@ -9,8 +9,8 @@ geometry = [('H',   (0,0,-r)),
             ('H',   (0,0,r))]
 
 
-filename = "beh2_r2684_random_sd.out"
+filename = "beh2_r2684_random04_sd.out"
 
 sys.stdout = open(filename, 'w')
 
-vqe_methods.test_random(geometry,pool = operator_pools.singlet_SD(), seed=1)
+vqe_methods.test_random(geometry,pool = operator_pools.singlet_SD(), seed=4)

@@ -81,7 +81,7 @@ class singlet_GSD(OperatorPool):
                     self.fermi_ops.append(termA)
                        
       
-        pq = 0
+        pq = -1 
         for p in range(0,self.n_orb):
             pa = 2*p
             pb = 2*p+1
@@ -92,7 +92,7 @@ class singlet_GSD(OperatorPool):
         
                 pq += 1
         
-                rs = 0 
+                rs = -1 
                 for r in range(0,self.n_orb):
                     ra = 2*r
                     rb = 2*r+1
@@ -105,14 +105,14 @@ class singlet_GSD(OperatorPool):
                     
                         if(pq > rs):
                             continue
- 
+
                         termA =  FermionOperator(((ra,1),(pa,0),(sa,1),(qa,0)), 2/np.sqrt(12))
                         termA += FermionOperator(((rb,1),(pb,0),(sb,1),(qb,0)), 2/np.sqrt(12))
                         termA += FermionOperator(((ra,1),(pa,0),(sb,1),(qb,0)), 1/np.sqrt(12))
                         termA += FermionOperator(((rb,1),(pb,0),(sa,1),(qa,0)), 1/np.sqrt(12))
                         termA += FermionOperator(((ra,1),(pb,0),(sb,1),(qa,0)), 1/np.sqrt(12))
                         termA += FermionOperator(((rb,1),(pa,0),(sa,1),(qb,0)), 1/np.sqrt(12))
- 
+                                                                      
                         termB =  FermionOperator(((ra,1),(pa,0),(sb,1),(qb,0)),  1/2.0)
                         termB += FermionOperator(((rb,1),(pb,0),(sa,1),(qa,0)),  1/2.0)
                         termB += FermionOperator(((ra,1),(pb,0),(sb,1),(qa,0)), -1/2.0)
