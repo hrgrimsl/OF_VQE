@@ -234,7 +234,7 @@ def test_random(geometry,
         ):
 
     # {{{
-    random.seed(1)
+    random.seed(seed)
 
     molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
     molecule.filename = psi4_filename
