@@ -28,6 +28,7 @@ def adapt_vqe(geometry,
         ):
 # {{{
 
+        
     molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
     molecule.filename = psi4_filename
     molecule = openfermionpsi4.run_psi4(molecule, 
@@ -37,6 +38,16 @@ def adapt_vqe(geometry,
                 run_ccsd = 0, 
                 run_fci=1, 
                 delete_input=1)
+    
+    
+    
+    pool_test = operator_pools.qubits()
+
+    pool_test.init(molecule)
+
+    pool_test.generate_SparseMatrix()
+    
+    exit()
     pool.init(molecule)
     print(" Basis: ", basis)
 

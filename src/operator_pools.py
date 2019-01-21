@@ -248,10 +248,39 @@ class singlet_SD(OperatorPool):
 
 
 
-def unrestricted_SD(n_occ_a, n_occ_b, n_vir_a, n_vir_b):
-    print("NYI")
-    exit()
+class unrestricted_SD(OperatorPool):
+    def __init__(self):
+        exit()
                 
+
+
+
+class qubits(OperatorPool):
+    def generate_SQ_Operators(self):
+
+        self.fermi_ops = []
+        for p in range(0,self.n_orb):
+            for q in range(0,self.n_orb):
+                op = 'CPHASE(%i,%i)'%(p,q)
+                    
+                self.fermi_ops.append(op)
+                
+        for p in range(0,self.n_orb):
+            op = 'H(%i)'%(p)
+                    
+            self.fermi_ops.append(op)
+                
+    def generate_SparseMatrix(self):
+        self.spmat_ops = []
+        
+        for op in self.fermi_ops:
+            print(op)
+
+
+
+        assert(len(self.spmat_ops) == self.n_ops)
+        return
+
 
 
 
