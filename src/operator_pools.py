@@ -258,9 +258,9 @@ class unrestricted_SD(OperatorPool):
 class qubits(OperatorPool):
     def generate_SQ_Operators(self):
 
-       # X = sp.sparse.csr_matrix(nparray([[0, 1], [1, 0]]))
-      #  Y = sp.sparse.csr_matrix(nparray([[0, -1j], [1j, 0]]))
-      #  Z = sp.sparse.csr_matrix(nparray([[1, 0], [0, -1]]))
+        X = sp.sparse.csr_matrix(nparray([[0, 1], [1, 0]]))
+        Y = sp.sparse.csr_matrix(nparray([[0, -1j], [1j, 0]]))
+        Z = sp.sparse.csr_matrix(nparray([[1, 0], [0, -1]]))
         self.fermi_ops = []
         for p in range(0,self.n_orb):
             for q in range(0,self.n_orb):
@@ -268,24 +268,27 @@ class qubits(OperatorPool):
                     
                 self.fermi_ops.append(op)
                 
-        #for p in range(0,self.n_orb):
-         #   pa = 2*p
-          #  pb = 2*p+1
-           #XA = 1j*sp.sparse.kron((sp.sparse.kron(sp.sparse.csr_matrix(np.identity(2**pa))), X), sp.sparse.csr_matrix(np.identity(2**(2*self.n_orb-pa))))
-          #  XB = 1j*sp.sparse.kron((sp.sparse.kron(sp.sparse.csr_matrix(np.identity(2**pb))), X), sp.sparse.csr_matrix(np.identity(2**(2*self.n_orb-pb))))       
-          #  YA = 1j*sp.sparse.kron((sp.sparse.kron(sp.sparse.csr_matrix(np.identity(2**pa))), Y), sp.sparse.csr_matrix(np.identity(2**(2*self.n_orb-pa))))       
-          #  YB = 1j*sp.sparse.kron((sp.sparse.kron(sp.sparse.csr_matrix(np.identity(2**pb))), Y), sp.sparse.csr_matrix(np.identity(2**(2*self.n_orb-pb))))       
-          #  ZA = 1j*sp.sparse.kron((sp.sparse.kron(sp.sparse.csr_matrix(np.identity(2**pa))), Z), sp.sparse.csr_matrix(np.identity(2**(2*self.n_orb-pa))))       
-          #  ZB = 1j*sp.sparse.kron((sp.sparse.kron(sp.sparse_csr_matrix(np.identity(2**pb))), Z), sp.sparse_csr_matrix(np.identity(2**(2*self.n_orb-pb))))       
+        for p in range(0,2*self.n_orb):
+            IL = sp.sparse.csr_matrix(np.identity(2**p))
+            IR = sp.sparse.csr_matrix(np.identity(2**(2*self.n_orb-p)))
+            
+            X = 1j*sp.sparse.kron(sp.sparse.kron(IL,X),IR)
+            Y = 1j*sp.sparse.kron(sp.sparse.kron(IL,Y),IR)
+            Z = 1j*sp.sparse.kron(sp.sparse.kron(IL,Z),IR)
 
-          #  self.fermi_ops.append(XA)
-          #  self.fermi_ops.append(XB)
-          #  self.fermi_ops.append(YA)
-          #  self.fermi_ops.append(YB)
-          #  self.fermi_ops.append(ZA)
-          #  self.fermi_ops.append(ZB)
+            self.fermi_ops.append(X)
+            self.fermi_ops.append(X)
+            self.fermi_ops.append(Y)
+          
+            for q in range (p,2*self.n_orb):
+                IM = sp.sparse.csr_matrix(np.identity(2**(q-p-1)))
+                IR = sp.sparse.csr_matrix(np.identity(2**(2*self.n_orb-q-1)))
+                ZZ = 1j*sp.sparse.kron(IL,1/2*(np.identity(2)-Z))
+                ZZ = sp.sparse.kron(ZZ,IM)
+                ZZ = sp.sparse.kron(ZZ,1/2*(np.identity(2)-Z))
+                ZZ = sp.sparse.kron(ZZ,IR)
 
-
+                self.fermi_ops.append(ZZ)
                         
     def generate_SparseMatrix(self):
         self.spmat_ops = []
