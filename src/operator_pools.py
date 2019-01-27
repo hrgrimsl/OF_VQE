@@ -247,35 +247,25 @@ class singlet_SD(OperatorPool):
         return 
 
 
-
-class unrestricted_SD(OperatorPool):
-    def __init__(self):
-        exit()
-                
-
-
-
 class qubits(OperatorPool):
     def generate_SQ_Operators(self):
 
         self.fermi_ops = []
                 
         for p in range(0,2*self.n_orb):
-            X = QubitOperator('Xp', 1j)
-            Z = QubitOperator('Zp', 1j)
+            X = QubitOperator('X%d'% p, 1j)
+            Z = QubitOperator('Z%d'% p, 1j)
 
             self.fermi_ops.append(X)
             self.fermi_ops.append(Z)
           
-            for q in range (p,2*self.n_orb):
+            for q in range(p,2*self.n_orb):
 
-                ZZ = QubitOperator('Zp Zq', 1j)
+                ZZ = QubitOperator('Z%d Z%d'% (p, q), 1j)
                 self.fermi_ops.append(ZZ)
                         
         for op in self.fermi_ops:
             print(op)
-
-
 
         assert(len(self.spmat_ops) == self.n_ops)
         return
