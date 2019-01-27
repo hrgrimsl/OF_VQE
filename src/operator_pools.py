@@ -258,42 +258,20 @@ class unrestricted_SD(OperatorPool):
 class qubits(OperatorPool):
     def generate_SQ_Operators(self):
 
-        X = sp.sparse.csr_matrix(nparray([[0, 1], [1, 0]]))
-        Y = sp.sparse.csr_matrix(nparray([[0, -1j], [1j, 0]]))
-        Z = sp.sparse.csr_matrix(nparray([[1, 0], [0, -1]]))
         self.fermi_ops = []
-        for p in range(0,self.n_orb):
-            for q in range(0,self.n_orb):
-                op = 'CPHASE(%i,%i)'%(p,q)
-                    
-                self.fermi_ops.append(op)
                 
         for p in range(0,2*self.n_orb):
-            IL = sp.sparse.csr_matrix(np.identity(2**p))
-            IR = sp.sparse.csr_matrix(np.identity(2**(2*self.n_orb-p)))
-            
-            X = 1j*sp.sparse.kron(sp.sparse.kron(IL,X),IR)
-            Y = 1j*sp.sparse.kron(sp.sparse.kron(IL,Y),IR)
-            Z = 1j*sp.sparse.kron(sp.sparse.kron(IL,Z),IR)
+            X = QubitOperator('Xp', 1j)
+            Z = QubitOperator('Zp', 1j)
 
             self.fermi_ops.append(X)
-            self.fermi_ops.append(X)
-            self.fermi_ops.append(Y)
+            self.fermi_ops.append(Z)
           
             for q in range (p,2*self.n_orb):
-                IM = sp.sparse.csr_matrix(np.identity(2**(q-p-1)))
-                IR = sp.sparse.csr_matrix(np.identity(2**(2*self.n_orb-q-1)))
-                ZZ = 1j*sp.sparse.kron(IL,1/2*(np.identity(2)-Z))
-                ZZ = sp.sparse.kron(ZZ,IM)
-                ZZ = sp.sparse.kron(ZZ,1/2*(np.identity(2)-Z))
-                ZZ = sp.sparse.kron(ZZ,IR)
 
+                ZZ = QubitOperator('Zp Zq', 1j)
                 self.fermi_ops.append(ZZ)
                         
-    def generate_SparseMatrix(self):
-        self.spmat_ops = []
-        
-        print("abc")
         for op in self.fermi_ops:
             print(op)
 
