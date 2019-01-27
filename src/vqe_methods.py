@@ -44,8 +44,6 @@ def adapt_vqe(geometry,
     pool_test = operator_pools.qubits()
 
     pool_test.init(molecule)
-
-    pool_test.generate_SparseMatrix()
     
     exit()
     pool.init(molecule)
