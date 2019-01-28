@@ -136,6 +136,7 @@ def adapt_vqe(geometry,
                     opstring += str(t)
                     break
                 print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+            curr_state = trial_model.prepare_state(parameters)
             trial_model.curr_params = parameters
             break
         
@@ -170,27 +171,111 @@ def adapt_vqe(geometry,
         print(" ------------------------------")
         print(" Compute Newton-Step correction")
         print(" ------------------------------")
-     
+        
+        
+        
+
         if len(ansatz_grad)>0:
             scipy_hessian = np.linalg.pinv(opt_result.hess_inv)
         else:
             trial_model = tUCCSD(hamiltonian, ansatz_mat, reference_ket, parameters)
             scipy_hessian = np.array(())
-       
-    
-        print(scipy_hessian)
-
+        
         hess,grad = trial_model.Build_Hessian(pool, trial_model.curr_params, scipy_hessian) 
-
+        
+        ##  compute numierical hessian
+        if 1:
+            ansatz_mat_n = cp.deepcopy(ansatz_mat)
+            parameters_n = cp.deepcopy(parameters)
+            for si in range(pool.n_ops):
+                ansatz_mat_n.insert(0,pool.spmat_ops[si])
+                parameters_n.insert(0,0)
+            trial_model_n = tUCCSD(hamiltonian, ansatz_mat_n, reference_ket, parameters_n)
+         
+            stepsize = 1e-5 
+            grad_n = np.zeros((len(parameters_n),1))
+            # compute gradient
+            ggi = 0
+            for gi in reversed(range(len(parameters_n))):
+                pi_f1 = cp.deepcopy(parameters_n)
+                pi_r1 = cp.deepcopy(parameters_n)
+                pi_f2 = cp.deepcopy(parameters_n)
+                pi_r2 = cp.deepcopy(parameters_n)
+                
+                pi_f1[gi] += stepsize
+                pi_r1[gi] -= stepsize
+                
+                pi_f2[gi] += 2*stepsize
+                pi_r2[gi] -= 2*stepsize
+         
+                e_f1 = trial_model_n.energy(pi_f1)
+                e_f2 = trial_model_n.energy(pi_f2)
+                e_r1 = trial_model_n.energy(pi_r1)
+                e_r2 = trial_model_n.energy(pi_r2)
+                grad_n[gi] = ( -e_f2 + 8*e_f1 -8*e_r1+e_r2)/(12 * stepsize)
+         
+                print(" %4i %16.12f" %(gi, grad_n[gi]))
+                ggi += 1 
+         
+            # compute hessian 
+            hess_n = np.zeros((len(parameters_n),len(parameters_n)))
+            ggi = 0
+            for gi in reversed(range(len(parameters_n))):
+                ggj = 0
+                for gj in reversed(range(gi,len(parameters_n))):
+                    pi_ff = cp.deepcopy(parameters_n)
+                    pi_rf = cp.deepcopy(parameters_n)
+                    pi_fr = cp.deepcopy(parameters_n)
+                    pi_rr = cp.deepcopy(parameters_n)
+                    
+                    pi_ff[gi] += stepsize
+                    pi_ff[gj] += stepsize
+                    
+                    pi_fr[gi] += stepsize
+                    pi_fr[gj] -= stepsize
+                    
+                    pi_rf[gi] -= stepsize
+                    pi_rf[gj] += stepsize
+                    
+                    pi_rr[gi] -= stepsize
+                    pi_rr[gj] -= stepsize
+                    
+                    e_ff = trial_model_n.energy(pi_ff)
+                    e_fr = trial_model_n.energy(pi_fr)
+                    e_rf = trial_model_n.energy(pi_rf)
+                    e_rr = trial_model_n.energy(pi_rr)
+                    hess_n[gi,gj] = ( e_ff - e_rf - e_fr + e_rr)/(4*stepsize * stepsize)
+        
+                    hess_n[gj,gi] = hess_n[gi,gj]
+                    print(" %4i,%-4i %16.12f vs %16.12f" %(gi,gj, hess_n[gi,gj], hess[ggi,ggj]))
+                    ggj += 1
+                ggi += 1
+    
+            e_pt2 = -.5*grad_n.T.conj().dot(np.linalg.pinv(hess_n).dot(grad_n)) 
+            print(" Correction = %12.8f " %(e_pt2))
+        
+        grad = np.zeros((pool.n_ops,1)) 
+        sig = hamiltonian.dot(curr_state)
+        for op_trial in range(pool.n_ops):
+            
+            opA = pool.spmat_ops[op_trial]
+            com = 2*(curr_state.transpose().conj().dot(opA.dot(sig))).real
+            assert(com.shape == (1,1))
+            com = com[0,0]
+            assert(np.isclose(com.imag,0))
+            com = com.real
+            #print(" %4i %12.8f" %(op_trial, com) )
+            grad[op_trial] = com
+    
+       
+        
         if len(ansatz_grad)>0:
             grad = np.hstack((grad, ansatz_grad))
-
-        for l in range(grad.shape[0]):
-            print("%12.8f" %grad[l])
 
 
         e_pt2 = -.5*grad.T.conj().dot(np.linalg.pinv(hess).dot(grad)) 
         print(" Correction = %12.8f " %(e_pt2))
+        
 
 # }}}
 
@@ -558,13 +643,15 @@ def test_lexical(geometry,
 
 
 if __name__== "__main__":
-    r = 1.5
+
+    
+    r = 2.36
+    geometry = [('H', (0,0,1*r)), ('Li', (0,0,2*r))]
+    
+    r = 1.0
     geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
-    r = 2.39
-    geometry = [('H', (0,0,1*r)), ('Li', (0,0,2*r))]
-
     #vqe_methods.ucc(geometry,pool = operator_pools.singlet_SD())
-    model = vqe_methods.adapt_vqe(geometry, adapt_thresh=1e-2, adapt_maxiter = 0, pool = operator_pools.singlet_SD(), pt2=True)
+    model = vqe_methods.adapt_vqe(geometry, adapt_thresh=1e-3, adapt_maxiter=100, pool = operator_pools.singlet_GSD(), pt2=True)
     #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_GSD())
 
