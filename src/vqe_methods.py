@@ -24,7 +24,8 @@ def adapt_vqe(geometry,
         adapt_maxiter   = 200,
         pool            = operator_pools.singlet_GSD(),
         spin_adapt      = True,
-        psi4_filename   = "psi4_%12.12f"%random.random()
+        psi4_filename   = "psi4_%12.12f"%random.random(),
+        pt2             = False
         ):
 # {{{
 
@@ -69,6 +70,7 @@ def adapt_vqe(geometry,
     parameters = []
     curr_state = 1.0*reference_ket
 
+    ansatz_grad = []
     print(" Now start to grow the ansatz")
     for n_iter in range(0,adapt_maxiter):
     
@@ -104,8 +106,7 @@ def adapt_vqe(geometry,
             if abs(com) > abs(next_deriv):
                 next_deriv = com
                 next_index = op_trial
-
-        
+            
         curr_norm = np.sqrt(curr_norm)
 
         min_options = {'gtol': theta_thresh, 'disp':False}
@@ -135,6 +136,7 @@ def adapt_vqe(geometry,
                     opstring += str(t)
                     break
                 print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+            trial_model.curr_params = parameters
             break
         
         print(" Add operator %4i" %next_index)
@@ -148,6 +150,8 @@ def adapt_vqe(geometry,
         opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
                 options = min_options, method = 'BFGS', callback=trial_model.callback)
     
+        ansatz_grad = trial_model.der
+
         parameters = list(opt_result['x'])
         curr_state = trial_model.prepare_state(parameters)
         print(" Finished: %20.12f" % trial_model.curr_energy)
@@ -160,6 +164,33 @@ def adapt_vqe(geometry,
                 opstring += str(t)
                 break
             print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+
+    if pt2:
+        print()
+        print(" ------------------------------")
+        print(" Compute Newton-Step correction")
+        print(" ------------------------------")
+     
+        if len(ansatz_grad)>0:
+            scipy_hessian = np.linalg.pinv(opt_result.hess_inv)
+        else:
+            trial_model = tUCCSD(hamiltonian, ansatz_mat, reference_ket, parameters)
+            scipy_hessian = np.array(())
+       
+    
+        print(scipy_hessian)
+
+        hess,grad = trial_model.Build_Hessian(pool, trial_model.curr_params, scipy_hessian) 
+
+        if len(ansatz_grad)>0:
+            grad = np.hstack((grad, ansatz_grad))
+
+        for l in range(grad.shape[0]):
+            print("%12.8f" %grad[l])
+
+
+        e_pt2 = -.5*grad.T.conj().dot(np.linalg.pinv(hess).dot(grad)) 
+        print(" Correction = %12.8f " %(e_pt2))
 
 # }}}
 
@@ -530,6 +561,10 @@ if __name__== "__main__":
     r = 1.5
     geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
-    vqe_methods.ucc(geometry,pool = operator_pools.singlet_SD())
-    #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_SD())
+    r = 2.39
+    geometry = [('H', (0,0,1*r)), ('Li', (0,0,2*r))]
+
+    #vqe_methods.ucc(geometry,pool = operator_pools.singlet_SD())
+    model = vqe_methods.adapt_vqe(geometry, adapt_thresh=1e-2, adapt_maxiter = 0, pool = operator_pools.singlet_SD(), pt2=True)
     #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_GSD())
+
