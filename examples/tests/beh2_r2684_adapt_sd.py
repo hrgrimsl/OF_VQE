@@ -15,4 +15,4 @@ sys.stdout = open(filename, 'w')
 
 vqe_methods.adapt_vqe(geometry,
         pool = operator_pools.singlet_SD(),
-        adapt_thresh = 1e-5)
+        adapt_thresh = 1e-7)
