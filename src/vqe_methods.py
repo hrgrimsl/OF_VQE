@@ -39,13 +39,6 @@ def adapt_vqe(geometry,
                 run_fci=1, 
                 delete_input=1)
     
-    
-    
-    pool_test = operator_pools.qubits()
-
-    pool_test.init(molecule)
-    
-    exit()
     pool.init(molecule)
     print(" Basis: ", basis)
 
