@@ -253,22 +253,24 @@ class qubits(OperatorPool):
         self.fermi_ops = []
                 
         for p in range(0,2*self.n_orb):
-            X = QubitOperator('X%d'% p, 1j)
-            Z = QubitOperator('Z%d'% p, 1j)
+            X = QubitOperator('X%d'% p, 0+1j)
+            Z = QubitOperator('Z%d'% p, 0+1j)
 
             self.fermi_ops.append(X)
             self.fermi_ops.append(Z)
           
-            for q in range(p,2*self.n_orb):
+            for q in range(p+1,2*self.n_orb):
 
-                ZZ = QubitOperator('Z%d Z%d'% (p, q), 1j)
+                ZZ = QubitOperator('Z%d Z%d'% (p, q), 0+1j)
                 self.fermi_ops.append(ZZ)
                         
         for op in self.fermi_ops:
             print(op)
 
-        assert(len(self.spmat_ops) == self.n_ops)
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of operators: ", self.n_ops)        
         return
+
 
 
 
