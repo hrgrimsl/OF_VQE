@@ -57,6 +57,7 @@ def newton_correction(state,
         print(" %12.8f , %12.8f" %(grad[i],delx[i]))    
     e_pt2 = grad.T.conj().dot(delx) + .5*delx.T.conj().dot(hess.dot(delx)) 
     print(" Correction =  %16.14f " %(e_pt2))
+    print(np.linalg.norm(hess - hess.T))
     return hess, grad, e_pt2
 
 def adapt_vqe(geometry,
