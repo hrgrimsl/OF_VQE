@@ -14,6 +14,51 @@ from tVQE import *
 from openfermion import *
 
 
+def newton_correction(state,
+                        hamiltonian,
+                        pool):
+    print(" Compute Gradient")
+    grad = np.zeros((pool.n_ops,1))
+    sig = hamiltonian.dot(state)
+    for op_trial in range(pool.n_ops):
+        
+        opA = pool.spmat_ops[op_trial]
+        com = 2*(state.transpose().conj().dot(opA.dot(sig))).real
+        assert(com.shape == (1,1))
+        com = com[0,0]
+        assert(np.isclose(com.imag,0))
+        com = com.real
+        grad[op_trial] = com
+    
+
+    print(" Compute Hessian")
+    hess = np.zeros((pool.n_ops,pool.n_ops))
+
+    # 2*R <HAB> + 2*R <AHB>
+    for ai in range(pool.n_ops):
+        opA = pool.spmat_ops[ai]
+        pA = opA.dot(state)
+    
+        for bi in range(pool.n_ops):
+            opB = pool.spmat_ops[bi]
+            pB = opB.dot(state)
+           
+            term1 = 2*(sig.transpose().conj().dot(opA.dot(pB))).real 
+            term2 = 2*(pA.transpose().conj().dot(hamiltonian.dot(pB))).real
+         
+            term = term1 + term2
+            assert(term.shape == (1,1))
+            term = term[0,0]
+            hess[ai,bi] = term
+   
+    delx = - np.linalg.pinv(hess).dot(grad)
+
+    for i in range(grad.shape[0]):
+        print(" %12.8f , %12.8f" %(grad[i],delx[i]))    
+    e_pt2 = grad.T.conj().dot(delx) + .5*delx.T.conj().dot(hess.dot(delx)) 
+    print(" Correction =  %16.14f " %(e_pt2))
+    return hess, grad, e_pt2
+
 def adapt_vqe(geometry,
         basis           = "sto-3g",
         multiplicity    = 1,
@@ -156,6 +201,10 @@ def adapt_vqe(geometry,
         parameters = list(opt_result['x'])
         curr_state = trial_model.prepare_state(parameters)
         print(" Finished: %20.12f" % trial_model.curr_energy)
+        
+        hess,grad,ept2 = newton_correction(curr_state, hamiltonian, pool) 
+        print(" E(2)    : %20.12f" % (trial_model.curr_energy+ept2))
+        
         print(" -----------New ansatz----------- ")
         print(" %4s %40s %12s" %("#","Term","Coeff"))
         for si in range(len(ansatz_ops)):
@@ -165,6 +214,7 @@ def adapt_vqe(geometry,
                 opstring += str(t)
                 break
             print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
+        
 
     if pt2:
         print()
@@ -181,10 +231,15 @@ def adapt_vqe(geometry,
             trial_model = tUCCSD(hamiltonian, ansatz_mat, reference_ket, parameters)
             scipy_hessian = np.array(())
         
-        hess,grad = trial_model.Build_Hessian(pool, trial_model.curr_params, scipy_hessian) 
-        
+        #hess,grad = trial_model.Build_Hessian(pool, trial_model.curr_params, scipy_hessian) 
+        hess,grad,ept2 = newton_correction(curr_state, hamiltonian, pool) 
+       
+
+        u,s,v = np.linalg.svd(hess)
+        for si in range(s.shape[0]):
+            print(" %12.8f" %s[si])
         ##  compute numierical hessian
-        if 1:
+        if 0:
             ansatz_mat_n = cp.deepcopy(ansatz_mat)
             parameters_n = cp.deepcopy(parameters)
             for si in range(pool.n_ops):
@@ -253,28 +308,6 @@ def adapt_vqe(geometry,
     
             e_pt2 = -.5*grad_n.T.conj().dot(np.linalg.pinv(hess_n).dot(grad_n)) 
             print(" Correction = %12.8f " %(e_pt2))
-        
-        grad = np.zeros((pool.n_ops,1)) 
-        sig = hamiltonian.dot(curr_state)
-        for op_trial in range(pool.n_ops):
-            
-            opA = pool.spmat_ops[op_trial]
-            com = 2*(curr_state.transpose().conj().dot(opA.dot(sig))).real
-            assert(com.shape == (1,1))
-            com = com[0,0]
-            assert(np.isclose(com.imag,0))
-            com = com.real
-            #print(" %4i %12.8f" %(op_trial, com) )
-            grad[op_trial] = com
-    
-       
-        
-        if len(ansatz_grad)>0:
-            grad = np.hstack((grad, ansatz_grad))
-
-
-        e_pt2 = -.5*grad.T.conj().dot(np.linalg.pinv(hess).dot(grad)) 
-        print(" Correction = %12.8f " %(e_pt2))
         
 
 # }}}
@@ -645,13 +678,13 @@ def test_lexical(geometry,
 if __name__== "__main__":
 
     
-    r = 2.36
-    geometry = [('H', (0,0,1*r)), ('Li', (0,0,2*r))]
-    
     r = 1.0
     geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
+    
+    r = 2.36
+    geometry = [('H', (0,0,1*r)), ('Li', (0,0,2*r))]
 
     #vqe_methods.ucc(geometry,pool = operator_pools.singlet_SD())
-    model = vqe_methods.adapt_vqe(geometry, adapt_thresh=1e-3, adapt_maxiter=100, pool = operator_pools.singlet_GSD(), pt2=True)
+    model = vqe_methods.adapt_vqe(geometry, adapt_thresh=1e-5, adapt_maxiter=100, pool = operator_pools.singlet_GSD(), pt2=True)
     #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_GSD())
 
