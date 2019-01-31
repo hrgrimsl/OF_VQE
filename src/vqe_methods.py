@@ -57,6 +57,7 @@ def adapt_vqe(geometry,
     #JW transform Hamiltonian computed classically with OFPsi4
     hamiltonian_op = molecule.get_molecular_hamiltonian()
     hamiltonian = openfermion.transforms.get_sparse_operator(hamiltonian_op)
+    print(hamiltonian[:,240])
 
     #Thetas
     parameters = []
@@ -86,10 +87,22 @@ def adapt_vqe(geometry,
         next_term = []
         print(" Measure commutators:")
         sig = hamiltonian.dot(curr_state)
+        AA = pool.spmat_ops[0].dot(sig)
+        print(AA)
+
+        for nn in range(0,7):
+            print("XH (240,240)",pool.spmat_ops[nn].dot(hamiltonian)[240,240])
+
         for op_trial in range(pool.n_ops):
-            
+
             opA = pool.spmat_ops[op_trial]
+            opB = pool.spmat_ops[1]
             com = 2*(curr_state.transpose().conj().dot(opA.dot(sig))).real
+          #  vals, vecs = scipy.sparse.linalg.eigs(opA.dot(hamiltonian))
+          #  print("X",vals)
+          #  vals, vecs = scipy.sparse.linalg.eigs(opB.dot(hamiltonian))
+          #  print("Z",vals)
+           # print(pool.spmat_ops[1].dot(hamiltonian))
             assert(com.shape == (1,1))
             com = com[0,0]
             assert(np.isclose(com.imag,0))
@@ -127,7 +140,7 @@ def adapt_vqe(geometry,
         if converged:
             print(" Ansatz Growth Converged!")
             print(" Number of operators in ansatz: ", len(ansatz_ops))
-            print(" *Finished: %20.12f" % trial_model.curr_energy)
+            #print(" *Finished: %20.12f" % trial_model.curr_energy)
             print(" -----------Final ansatz----------- ")
             print(" %4s %40s %12s" %("#","Term","Coeff"))
             for si in range(len(ansatz_ops)):
@@ -296,7 +309,6 @@ def test_random(geometry,
         sig = hamiltonian.dot(curr_state)
         for op_trial in range(pool.n_ops):
             
-            opA = pool.spmat_ops[op_trial]
             com = 2*(curr_state.transpose().conj().dot(opA.dot(sig))).real
             assert(com.shape == (1,1))
             com = com[0,0]
