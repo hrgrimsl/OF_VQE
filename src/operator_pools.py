@@ -42,6 +42,7 @@ class OperatorPool:
         for op in self.fermi_ops:
             self.spmat_ops.append(transforms.get_sparse_operator(op, n_qubits = self.n_spin_orb))
         assert(len(self.spmat_ops) == self.n_ops)
+ #       print(self.spmat_ops[1])
         return
 
 
@@ -254,11 +255,14 @@ class qubits(OperatorPool):
                 
         for p in range(0,2*self.n_orb):
             X = QubitOperator('X%d'% p, 0+1j)
-            Z = QubitOperator('Z%d'% p, 0+1j)
 
             self.fermi_ops.append(X)
+        for p in range(0,2*self.n_orb):
+            Z = QubitOperator('Z%d'% p, 0+1j)
+
             self.fermi_ops.append(Z)
-          
+        for p in range(0,2*self.n_orb):
+
             for q in range(p+1,2*self.n_orb):
 
                 ZZ = QubitOperator('Z%d Z%d'% (p, q), 0+1j)
