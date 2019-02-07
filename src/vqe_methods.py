@@ -57,10 +57,11 @@ def adapt_vqe(geometry,
     #JW transform Hamiltonian computed classically with OFPsi4
     hamiltonian_op = molecule.get_molecular_hamiltonian()
     hamiltonian = openfermion.transforms.get_sparse_operator(hamiltonian_op)
-    print(hamiltonian[:,240])
+  #  print(hamiltonian[:,240])
 
     #Thetas
     parameters = []
+    Sign = []
 
     pool.generate_SparseMatrix()
    
@@ -71,6 +72,9 @@ def adapt_vqe(geometry,
     op_indices = []
     parameters = []
     curr_state = 1.0*reference_ket
+
+   # curr_state = 1/np.sqrt(2)*(pool.spmat_ops[49].dot(curr_state) + curr_state)
+
 
     print(" Now start to grow the ansatz")
     for n_iter in range(0,adapt_maxiter):
@@ -85,18 +89,29 @@ def adapt_vqe(geometry,
         
         print(" Check each new operator for coupling")
         next_term = []
+        group = []
         print(" Measure commutators:")
         sig = hamiltonian.dot(curr_state)
-        AA = pool.spmat_ops[0].dot(sig)
-        print(AA)
+      # for n in range(0,255):
+      #     print("Hamiltonian(%d,%d) "%(n,n), hamiltonian[n,n])
 
-        for nn in range(0,7):
-            print("XH (240,240)",pool.spmat_ops[nn].dot(hamiltonian)[240,240])
+      # print("H 240 th column", hamiltonian[:,240])
+
+      # for nn in range(0,7):
+      #      print("XH-HX (240,240)",(pool.spmat_ops[nn].dot(hamiltonian)-pool.spmat_ops[nn])[240,240])
+      #  for n in range(8,15):
+      #      print("ZH-HZ(240,240)", (pool.spmat_ops[n].dot(hamiltonian)-hamiltonian.dot(pool.spmat_ops[n]))[240,240])
+      #  for n in range(44,71):
+      #      print("XXH(240,240)", (pool.spmat_ops[n].dot(hamiltonian))[240,240])
+      #  for n in range(44,71):
+      #     print('XX(%d)  240 th column'%n, pool.spmat_ops[n][:,240])
+      #  for n in range(44,71):
+      #      print('XX(%d) 240 th row'%n, pool.spmat_ops[n][240,:])
 
         for op_trial in range(pool.n_ops):
 
             opA = pool.spmat_ops[op_trial]
-            opB = pool.spmat_ops[1]
+          # opB = pool.spmat_ops[1]
             com = 2*(curr_state.transpose().conj().dot(opA.dot(sig))).real
           #  vals, vecs = scipy.sparse.linalg.eigs(opA.dot(hamiltonian))
           #  print("X",vals)
@@ -116,15 +131,24 @@ def adapt_vqe(geometry,
                 print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
 
             curr_norm += com*com
-            if abs(com) > abs(next_deriv):
+            if abs(com) > abs(next_deriv) + 1e-6:
+                group = []
                 next_deriv = com
                 next_index = op_trial
-
+                Sign = []
+            elif (next_deriv) > 1e-6:
+                if abs(abs(com)-abs(next_deriv)) < 1e-6:
+                    group.append(op_trial)
+                    sign = com*next_deriv/abs(com*next_deriv)
+                    Sign.append(sign)
         
+        print(Sign)
+
         curr_norm = np.sqrt(curr_norm)
 
         min_options = {'gtol': theta_thresh, 'disp':False}
      
+
         max_of_com = next_deriv
         print(" Norm of <[A,H]> = %12.8f" %curr_norm)
         print(" Max  of <[A,H]> = %12.8f" %max_of_com)
@@ -140,7 +164,7 @@ def adapt_vqe(geometry,
         if converged:
             print(" Ansatz Growth Converged!")
             print(" Number of operators in ansatz: ", len(ansatz_ops))
-            #print(" *Finished: %20.12f" % trial_model.curr_energy)
+            print(" *Finished: %20.12f" % trial_model.curr_energy)
             print(" -----------Final ansatz----------- ")
             print(" %4s %40s %12s" %("#","Term","Coeff"))
             for si in range(len(ansatz_ops)):
@@ -152,10 +176,19 @@ def adapt_vqe(geometry,
                 print(" %4i %40s %12.8f" %(si, opstring, parameters[si]) )
             break
         
+        new_op = pool.fermi_ops[next_index]
+        new_mat = pool.spmat_ops[next_index]
+
+        for n in range(len(group)):
+            new_op += Sign[n]*pool.fermi_ops[group[n]]
+            new_mat += Sign[n]*pool.spmat_ops[group[n]]
+
         print(" Add operator %4i" %next_index)
+        for n in group:
+            print(" Add operator %4i " %n)
         parameters.insert(0,0)
-        ansatz_ops.insert(0,pool.fermi_ops[next_index])
-        ansatz_mat.insert(0,pool.spmat_ops[next_index])
+        ansatz_ops.insert(0,new_op)
+        ansatz_mat.insert(0,new_mat)
         
         trial_model = tUCCSD(hamiltonian, ansatz_mat, reference_ket, parameters)
         
