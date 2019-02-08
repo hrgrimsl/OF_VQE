@@ -24,7 +24,8 @@ def adapt_vqe(geometry,
         adapt_maxiter   = 200,
         pool            = operator_pools.singlet_GSD(),
         spin_adapt      = True,
-        psi4_filename   = "psi4_%12.12f"%random.random()
+        psi4_filename   = "psi4_%12.12f"%random.random(),
+        qaoa            = None 
         ):
 # {{{
 
@@ -58,6 +59,9 @@ def adapt_vqe(geometry,
 
     #Thetas
     parameters = []
+    
+    if qaoa == 'hdvv':
+        pool.add_hdvv()
 
     pool.generate_SparseMatrix()
    
@@ -97,8 +101,9 @@ def adapt_vqe(geometry,
                 opstring += str(t)
                 break
        
-            if abs(com) > adapt_thresh:
-                print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
+            #if abs(com) > adapt_thresh:
+            #    print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
+            print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
 
             curr_norm += com*com
             if abs(com) > abs(next_deriv):
@@ -530,6 +535,6 @@ if __name__== "__main__":
     r = 1.5
     geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
 
-    vqe_methods.ucc(geometry,pool = operator_pools.singlet_SD())
-    #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_SD())
+    vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_SD(), qaoa='hdvv')
+    #vqe_methods.ucc(geometry,pool = operator_pools.singlet_SD())
     #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_GSD())
