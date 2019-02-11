@@ -76,7 +76,8 @@ def newton_correction(state,
     #    print(" %12.8f , %12.8f , %12.8f, %12.8f , %12.8f" %(s[i], gg[0,i],ggg[i,0],dd[0,i],ddd[i,0]))    
     
     e_pt2 =  dd @ ggg + .5*dd @ np.diag(s) @ ddd 
-    
+
+    print(" # Variables %5i : # Linearly Independent Variables %5i" %(U.shape[0], U.shape[1]))
     #assert(e_pt2.shape == (1,1))
     e_pt2 = e_pt2[0,0]
     #e_pt2 = grad.T.conj().dot(delx) + .5*delx.T.conj().dot(hess.dot(delx)) 
