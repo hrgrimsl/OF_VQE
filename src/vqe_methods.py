@@ -27,7 +27,6 @@ def adapt_vqe(geometry,
         psi4_filename   = "psi4_%12.12f"%random.random()
         ):
 # {{{
-
     molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
     molecule.filename = psi4_filename
     molecule = openfermionpsi4.run_psi4(molecule, 
@@ -60,7 +59,8 @@ def adapt_vqe(geometry,
     parameters = []
 
     pool.generate_SparseMatrix()
-   
+    pool.gradient_print_thresh = theta_thresh
+    
     ansatz_ops = []     #SQ operator strings in the ansatz
     ansatz_mat = []     #Sparse Matrices for operators in ansatz
     
@@ -84,35 +84,49 @@ def adapt_vqe(geometry,
         next_term = []
         print(" Measure commutators:")
         sig = hamiltonian.dot(curr_state)
+        e_curr = curr_state.T.conj().dot(sig)[0,0]
+        var = sig.T.conj().dot(sig)[0,0] - e_curr**2
+        uncertainty = np.sqrt(var.real)
+        assert(np.isclose(var.imag,0))
+        print(" Variance:    %12.8f" %var.real)
+        print(" Uncertainty: %12.8f" %uncertainty)
         for op_trial in range(pool.n_ops):
             
-            opA = pool.spmat_ops[op_trial]
-            com = 2*(curr_state.transpose().conj().dot(opA.dot(sig))).real
-            assert(com.shape == (1,1))
-            com = com[0,0]
-            assert(np.isclose(com.imag,0))
-            com = com.real
-            opstring = ""
-            for t in pool.fermi_ops[op_trial].terms:
-                opstring += str(t)
-                break
-       
-            if abs(com) > adapt_thresh:
-                print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
-
-            curr_norm += com*com
-            if abs(com) > abs(next_deriv):
-                next_deriv = com
+            gi = pool.compute_gradient_i(op_trial, curr_state, sig)
+            
+#            pi = cp.deepcopy(parameters)
+#            oi = cp.deepcopy(ansatz_ops)
+#            mi = cp.deepcopy(ansatz_mat)
+#
+#            pi.insert(0,0)
+#            oi.insert(0,pool.fermi_ops[op_trial])
+#            mi.insert(0,pool.spmat_ops[op_trial])
+#            
+#            model = tUCCSD(hamiltonian, mi, reference_ket, pi)
+#            ee = model.energy(pi)
+#            step = 1e-6
+#            pi[0] = step
+#            ef = model.energy(pi)
+#            
+#            pi[0] = -step
+#            er = model.energy(pi)
+#
+#            #print(" Energies: %12.8f: %12.8f: %12.8f " %(ee, ef, er))
+#            der = (ef - er)/(2*step)
+#            print(" %5i Compare: %12.8f vs %12.8f" %(op_trial, gi, der))
+#            print() 
+            curr_norm += gi*gi
+            if abs(gi) > abs(next_deriv):
+                next_deriv = gi
                 next_index = op_trial
 
-        
         curr_norm = np.sqrt(curr_norm)
 
         min_options = {'gtol': theta_thresh, 'disp':False}
      
-        max_of_com = next_deriv
-        print(" Norm of <[A,H]> = %12.8f" %curr_norm)
-        print(" Max  of <[A,H]> = %12.8f" %max_of_com)
+        max_of_gi = next_deriv
+        print(" Norm of <[H,A]> = %12.8f" %curr_norm)
+        print(" Max  of <[H,A]> = %12.8f" %max_of_gi)
 
         converged = False
         if adapt_conver == "norm":
@@ -528,8 +542,12 @@ def test_lexical(geometry,
 
 if __name__== "__main__":
     r = 1.5
-    geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
+    #geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r))]
+    geometry = [('H',  (0, 0, 0)), 
+                ('Li', (0, 0, r*2.39))]
+    #geometry = [('H', (0,0,1*r)), ('H', (0,0,2*r)), ('H', (0,0,3*r)), ('H', (0,0,4*r)), ('H', (0,0,5*r)), ('H', (0,0,6*r))]
 
-    vqe_methods.ucc(geometry,pool = operator_pools.singlet_SD())
+    #vqe_methods.ucc(geometry,pool = operator_pools.singlet_SD())
     #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_SD())
-    #vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_GSD())
+    #vqe_methods.adapt_vqe(geometry,pool = operator_pools.hamiltonian(), adapt_thresh=1e-7, theta_thresh=1e-8)
+    vqe_methods.adapt_vqe(geometry,pool = operator_pools.singlet_GSD(), adapt_thresh=1e-3)

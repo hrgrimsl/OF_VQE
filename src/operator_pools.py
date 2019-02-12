@@ -15,9 +15,10 @@ class OperatorPool:
         self.n_vir_b = 0
 
         self.n_spin_orb = 0
+        self.gradient_print_thresh = 0
 
     def init(self,molecule):
-
+        self.molecule = molecule
         self.n_orb = molecule.n_orbitals
         self.n_spin_orb = 2*self.n_orb 
         self.n_occ_a = molecule.get_n_alpha_electrons()
@@ -44,6 +45,35 @@ class OperatorPool:
         assert(len(self.spmat_ops) == self.n_ops)
         return
 
+    def compute_gradient_i(self,i,v,sig):
+        """
+        For a previously optimized state |n>, compute the gradient g(k) of exp(c(k) A(k))|n>
+        g(k) = 2Real<HA(k)>
+
+        Note - this assumes A(k) is an antihermitian operator. If this is not the case, the derived class should 
+        reimplement this function. Of course, also assumes H is hermitian
+
+        v   = current_state
+        sig = H*v
+
+
+        """
+        opA = self.spmat_ops[i]
+        gi = 2*(sig.transpose().conj().dot(opA.dot(v)))
+        assert(gi.shape == (1,1))
+        gi = gi[0,0]
+        assert(np.isclose(gi.imag,0))
+        gi = gi.real
+        
+        opstring = ""
+        for t in self.fermi_ops[i].terms:
+            opstring += str(t)
+            break
+        if abs(gi) > self.gradient_print_thresh:
+            print(" %4i %40s %12.8f" %(i, opstring, gi) )
+    
+        return gi
+   
 
 class singlet_GSD(OperatorPool):
     def generate_SQ_Operators(self):
@@ -245,6 +275,7 @@ class singlet_SD(OperatorPool):
         self.n_ops = len(self.fermi_ops)
         print(" Number of operators: ", self.n_ops)
         return 
+    
 
 
 
