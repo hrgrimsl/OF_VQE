@@ -131,6 +131,10 @@ def adapt_vqe(geometry,
                 print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
 
             curr_norm += com*com
+         #   if abs(com) > abs(next_deriv) +1e-6:
+         #       next_deriv = com
+         #       next_index = op_trial
+
             if abs(com) > abs(next_deriv) + 1e-6:
                 group = []
                 next_deriv = com
