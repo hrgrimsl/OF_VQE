@@ -252,6 +252,10 @@ class qubits(OperatorPool):
     def generate_SQ_Operators(self):
 
         self.fermi_ops = []
+        
+        n_occ = self.n_occ
+        n_vir = self.n_vir
+
                 
         for p in range(0,2*self.n_orb):
             X = QubitOperator('X%d'% p, 0+1j)
@@ -299,27 +303,101 @@ class qubits(OperatorPool):
   #                  self.fermi_ops.append(XXY)
   #                  self.fermi_ops.append(XYZ)
   #                  self.fermi_ops.append(YYZ)
+  #      for i in range(0,n_occ):
+  #          ia = 2*i
+  #          ib = 2*i+1
 
-        for p in range(0,2*self.n_orb):
-            for q in range(p+1,2*self.n_orb):
+  #          for j in range(i,n_occ):
+  #              ja = 2*j
+  #              jb = 2*j+1
+        
+  #              for a in range(0,n_vir):
+  #                  aa = 2*n_occ + 2*a
+  #                  ab = 2*n_occ + 2*a+1
+
+  #                  for b in range(a,n_vir):
+  #                      ba = 2*n_occ + 2*b
+  #                      bb = 2*n_occ + 2*b+1
+
+  #                      XYYY1 = QubitOperator('X%d Y%d Y%d Y%d'% (ia,ja,aa,ba), 1j)
+  #                      XYYY2 = QubitOperator('X%d Y%d Y%d Y%d'% (ib,jb,ab,bb), 1j)   
+  #                      XYYY3 = QubitOperator('X%d Y%d Y%d Y%d'% (ia,jb,aa,bb), 1j) 
+  #                      XYYY4 = QubitOperator('X%d Y%d Y%d Y%d'% (ib,ja,aa,bb), 1j)
+  #                      XYYY5 = QubitOperator('X%d Y%d Y%d Y%d'% (ib,ja,ab,ba), 1j)
+  #                      XYYY6 = QubitOperator('X%d Y%d Y%d Y%d'% (ia,jb,ab,ba), 1j)
+
+  #                      YXYY1 = QubitOperator('Y%d X%d Y%d Y%d'% (ia,ja,aa,ba), 1j)
+  #                      YXYY2 = QubitOperator('Y%d X%d Y%d Y%d'% (ib,jb,ab,bb), 1j)
+  #                      YXYY3 = QubitOperator('Y%d X%d Y%d Y%d'% (ia,jb,aa,bb), 1j)
+  #                      YXYY4 = QubitOperator('Y%d X%d Y%d Y%d'% (ib,ja,aa,bb), 1j)
+  #                      YXYY5 = QubitOperator('Y%d X%d Y%d Y%d'% (ia,jb,ab,ba), 1j)
+  #                      YXYY6 = QubitOperator('Y%d X%d Y%d Y%d'% (ib,ja,ab,ba), 1j)
+
+  #                      YYXY1 = QubitOperator('Y%d Y%d X%d Y%d'% (ia,ja,aa,ba), 1j)
+  #                      YYXY2 = QubitOperator('Y%d Y%d X%d Y%d'% (ib,jb,ab,bb), 1j)
+  #                      YYXY3 = QubitOperator('Y%d Y%d X%d Y%d'% (ia,jb,aa,bb), 1j)
+  #                      YYXY4 = QubitOperator('Y%d Y%d X%d Y%d'% (ib,ja,aa,bb), 1j)
+  #                      YYXY5 = QubitOperator('Y%d Y%d X%d Y%d'% (ia,jb,ab,ba), 1j)
+  #                      YYXY6 = QubitOperator('Y%d Y%d X%d Y%d'% (ib,ja,ab,ba), 1j)
+
+  #                      YYYX1 = QubitOperator('Y%d Y%d Y%d X%d'% (ia,ja,aa,ba), 1j)                       
+  #                      YYYX2 = QubitOperator('Y%d Y%d Y%d X%d'% (ib,jb,ab,bb), 1j)
+  #                      YYYX3 = QubitOperator('Y%d Y%d Y%d X%d'% (ia,jb,aa,bb), 1j)
+  #                      YYYX4 = QubitOperator('Y%d Y%d Y%d X%d'% (ib,ja,aa,bb), 1j)
+  #                      YYYX5 = QubitOperator('Y%d Y%d Y%d X%d'% (ia,jb,ab,ba), 1j)
+  #                      YYYX6 = QubitOperator('Y%d Y%d Y%d X%d'% (ib,ja,ab,ba), 1j)
+
+  #                      if (i != j) and (a != b):
+  #                          self.fermi_ops.append(XYYY1)
+  #                          self.fermi_ops.append(XYYY2)
+  #                          self.fermi_ops.append(YXYY1)
+  #                          self.fermi_ops.append(YXYY2)
+  #                          self.fermi_ops.append(YYXY1)
+  #                          self.fermi_ops.append(YYXY2)
+  #                          self.fermi_ops.append(YYYX1)
+  #                          self.fermi_ops.append(YYYX2)
+
+  #                      self.fermi_ops.append(XYYY3)
+  #                      self.fermi_ops.append(XYYY4)
+  #                      self.fermi_ops.append(XYYY5)
+  #                      self.fermi_ops.append(XYYY6)
+
+  #                      self.fermi_ops.append(YXYY3)
+  #                      self.fermi_ops.append(YXYY4)
+  #                      self.fermi_ops.append(YXYY5)
+  #                      self.fermi_ops.append(YXYY6)
+
+  #                      self.fermi_ops.append(YYXY3)
+  #                      self.fermi_ops.append(YYXY4)
+  #                      self.fermi_ops.append(YYXY5)
+  #                      self.fermi_ops.append(YYXY6)
+
+  #                      self.fermi_ops.append(YYYX3)
+  #                      self.fermi_ops.append(YYYX4)
+  #                      self.fermi_ops.append(YYYX5)
+  #                      self.fermi_ops.append(YYYX6)
+
+
+        for p in range(0,2*n_occ):
+            for q in range(p+1,2*n_occ):
                 for r in range(q+1,2*self.n_orb):
                     for s in range(r+1,2*self.n_orb):
                         XYYY = QubitOperator('X%d Y%d Y%d Y%d'% (p, q, r, s), 1j)
-                        YXYY = QubitOperator('Y%d X%d Y%d Y%d'% (p, q, r, s), 1j)
-                        YYXY = QubitOperator('Y%d Y%d X%d Y%d'% (p, q, r, s), 1j)
-                        YYYX = QubitOperator('Y%d Y%d Y%d X%d'% (p, q, r, s), 1j)
-                        XXXY = QubitOperator('X%d X%d X%d Y%d'% (p, q, r, s), 1j)
-                        YXXX = QubitOperator('Y%d X%d X%d X%d'% (p, q, r, s), 1j)
-                        XYXX = QubitOperator('X%d Y%d X%d X%d'% (p, q, r, s), 1j)
-                        XXYX = QubitOperator('X%d X%d Y%d X%d'% (p, q, r, s), 1j)
+                      #  YXYY = QubitOperator('Y%d X%d Y%d Y%d'% (p, q, r, s), 1j)
+                      #  YYXY = QubitOperator('Y%d Y%d X%d Y%d'% (p, q, r, s), 1j)
+                      #  YYYX = QubitOperator('Y%d Y%d Y%d X%d'% (p, q, r, s), 1j)
+                       # XXXY = QubitOperator('X%d X%d X%d Y%d'% (p, q, r, s), 1j)
+                       # YXXX = QubitOperator('Y%d X%d X%d X%d'% (p, q, r, s), 1j)
+                       # XYXX = QubitOperator('X%d Y%d X%d X%d'% (p, q, r, s), 1j)
+                       # XXYX = QubitOperator('X%d X%d Y%d X%d'% (p, q, r, s), 1j)
                         self.fermi_ops.append(XYYY)
-                        self.fermi_ops.append(YXYY)
-                        self.fermi_ops.append(YYXY)
-                        self.fermi_ops.append(YYYX)
-                        self.fermi_ops.append(XXXY)
-                        self.fermi_ops.append(XXYX)
-                        self.fermi_ops.append(XYXX)
-                        self.fermi_ops.append(YXXX)
+                      #  self.fermi_ops.append(YXYY)
+                      #  self.fermi_ops.append(YYXY)
+                      #  self.fermi_ops.append(YYYX)
+                      #  self.fermi_ops.append(XXXY)
+                      #  self.fermi_ops.append(XXYX)
+                      #  self.fermi_ops.append(XYXX)
+                      #  self.fermi_ops.append(YXXX)
 
                 
         for op in self.fermi_ops:
