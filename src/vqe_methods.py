@@ -26,8 +26,8 @@ def adapt_vqe(geometry,
         multiplicity    = 1,
         charge          = 1,
         adapt_conver    = 'norm',
-        adapt_thresh    = 1e-4,
-        theta_thresh    = 1e-7,
+        adapt_thresh    = 1e-9,
+        theta_thresh    = 1e-20,
         adapt_maxiter   = 200,
         pool            = operator_pools.singlet_GSD(),
         spin_adapt      = True,
@@ -35,7 +35,7 @@ def adapt_vqe(geometry,
         ):
 # {{{
 
-        
+       
     molecule = openfermion.hamiltonians.MolecularData(geometry, basis, multiplicity)
     molecule.filename = psi4_filename
     molecule = openfermionpsi4.run_psi4(molecule, 
@@ -66,12 +66,16 @@ def adapt_vqe(geometry,
 
     #Thetas
     parameters = []
+    parameters_index = []
+    parameters_mult = []
     Sign = []
 
     pool.generate_SparseMatrix()
    
     ansatz_ops = []     #SQ operator strings in the ansatz
     ansatz_mat = []     #Sparse Matrices for operators in ansatz
+    ansatz_ops_t = []
+    ansatz_mat_t = []
     
     #Build p-h reference and map it to JW transform
     reference_ket = scipy.sparse.csc_matrix(
@@ -91,7 +95,65 @@ def adapt_vqe(geometry,
     print(" Start ADAPT-VQE algorithm")
     op_indices = []
     parameters = []
+
     curr_state = 1.0*reference_ket
+    
+    # state = curr_state
+
+    # sig = hamiltonian.dot(state)
+    # hess = np.zeros((pool.n_ops,pool.n_ops))
+
+    # for ai in range(pool.n_ops):
+    #     opA = pool.spmat_ops[ai]
+    #     pA = opA.dot(state)
+    
+    #     for bi in range(pool.n_ops):
+    #         opB = pool.spmat_ops[bi]
+    #         pB = opB.dot(state)
+           
+    #         term1 = 2*(sig.transpose().conj().dot(opA.dot(pB))).real 
+    #         term2 = 2*(pA.transpose().conj().dot(hamiltonian.dot(pB))).real
+         
+    #         term = term1 + term2
+    #         assert(term.shape == (1,1))
+    #         term = term[0,0]
+    #         hess[ai,bi] = term
+
+    # lin_dep_thresh = 1e-4
+
+    # U,s,V = np.linalg.svd(hess)
+    # n_vecs = 0
+
+    # hess_pool = []
+
+    # for j in  range(0,pool.n_ops):
+    #     if s[j] > lin_dep_thresh:
+    #         left_vec = QubitOperator('X1', 0)
+    #         n_vecs += 1
+    #         for i in range(0,pool.n_ops):
+    #             left_vec += U[i,j]*pool.fermi_ops[i]
+    #             # print('right vectors :' v[:,n_vecs])
+    #         print('left vectors :', left_vec)
+    #         print('')
+
+    #         hess_pool.append(left_vec)
+
+    # hess_mat_pool = []
+
+    # hess_n_ops = 0
+
+    # for op in hess_pool:
+    #     hess_mat_pool.append(transforms.get_sparse_operator(op, n_qubits = pool.n_spin_orb))
+    # hess_n_ops = len(hess_pool)
+
+    # pool.n_ops = hess_n_ops
+    # pool.fermi_ops = hess_pool
+    # pool.spmat_ops = hess_mat_pool
+                
+    # U = U[:,0:n_vecs]
+    # s = s[0:n_vecs]
+    # V = V[0:n_vecs,:].T
+    # print(' Minimum number of ops: %4i' %(n_vecs) )
 
 
     # for n in range(16,len(pool.spmat_ops)):
@@ -100,6 +162,9 @@ def adapt_vqe(geometry,
 
     # curr_state = 1/np.sqrt(2)*(pool.spmat_ops[49].dot(curr_state) + curr_state)
 
+    fermi_ops = pool.fermi_ops
+    spmat_ops = pool.spmat_ops
+    n_ops = pool.n_ops
 
     print(" Now start to grow the ansatz")
     for n_iter in range(0,adapt_maxiter):
@@ -117,6 +182,62 @@ def adapt_vqe(geometry,
         group = []
         print(" Measure commutators:")
         sig = hamiltonian.dot(curr_state)
+
+        #===============================================
+
+        # hess = np.zeros((n_ops,n_ops))
+    
+        # for ai in range(n_ops):
+        #     opA = spmat_ops[ai]
+        #     pA = opA.dot(curr_state)
+        
+        #     for bi in range(n_ops):
+        #         opB = spmat_ops[bi]
+        #         pB = opB.dot(curr_state)
+               
+        #         term1 = 2*(sig.transpose().conj().dot(opA.dot(pB))).real 
+        #         term2 = 2*(pA.transpose().conj().dot(hamiltonian.dot(pB))).real
+             
+        #         term = term1 + term2
+        #         assert(term.shape == (1,1))
+        #         term = term[0,0]
+        #         hess[ai,bi] = term
+
+        # lin_dep_thresh = 1e-4
+    
+        # U,s,V = np.linalg.svd(hess)
+        # n_vecs = 0
+    
+        # hess_pool = []
+    
+        # for j in  range(0,n_ops):
+        #     # if s[j] > lin_dep_thresh:
+        #     left_vec = FermionOperator(((1,1),(2,0)), 0)
+        #     # left_vec = QubitOperator('X1', 0)
+        #     n_vecs += 1
+        #     for i in range(0,n_ops):
+        #         left_vec += U[i,j]*fermi_ops[i]
+        #         # print('right vectors :' v[:,n_vecs])
+        #     # print('left vectors :', left_vec)
+        #     # print('')
+
+        #     hess_pool.append(left_vec)
+    
+        # hess_mat_pool = []
+    
+        # hess_n_ops = 0
+    
+        # for op in hess_pool:
+        #     hess_mat_pool.append(transforms.get_sparse_operator(op, n_qubits = pool.n_spin_orb))
+        # hess_n_ops = len(hess_pool)
+
+        # print('number of effecive ops:', hess_n_ops)
+        
+        # pool.n_ops = hess_n_ops
+        # pool.fermi_ops = hess_pool
+        # pool.spmat_ops = hess_mat_pool
+
+        #==========================================
       # for n in range(0,255):
       #     print("Hamiltonian(%d,%d) "%(n,n), hamiltonian[n,n])
 
@@ -136,13 +257,7 @@ def adapt_vqe(geometry,
         for op_trial in range(pool.n_ops):
 
             opA = pool.spmat_ops[op_trial]
-          # opB = pool.spmat_ops[1]
             com = 2*(curr_state.transpose().conj().dot(opA.dot(sig))).real
-          #  vals, vecs = scipy.sparse.linalg.eigs(opA.dot(hamiltonian))
-          #  print("X",vals)
-          #  vals, vecs = scipy.sparse.linalg.eigs(opB.dot(hamiltonian))
-          #  print("Z",vals)
-           # print(pool.spmat_ops[1].dot(hamiltonian))
             assert(com.shape == (1,1))
             com = com[0,0]
             assert(np.isclose(com.imag,0))
@@ -156,9 +271,14 @@ def adapt_vqe(geometry,
             #     print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
 
             curr_norm += com*com
-            if abs(com) > abs(next_deriv) +1e-6:
+
+            #====================================================
+
+            if abs(com) > abs(next_deriv) + 1e-9:
                 next_deriv = com
                 next_index = op_trial
+
+            #=====================================================
 
             # if abs(com) > abs(next_deriv) + 1e-6:
             #     group = []
@@ -170,6 +290,8 @@ def adapt_vqe(geometry,
             #         group.append(op_trial)
             #         sign = com*next_deriv/abs(com*next_deriv)
             #         Sign.append(sign)
+
+            #======================================================
         
         print(Sign)
 
@@ -202,7 +324,7 @@ def adapt_vqe(geometry,
                 for t in s.terms:
                     opstring += str(t)
                     break
-                print(" %4s %20f %10s" %(s, parameters[si], si) )
+                print(" %4s %20f %10s" %(opstring, parameters[si], si) )
                 print(" ")
 
                 # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
@@ -231,18 +353,64 @@ def adapt_vqe(geometry,
 
         print(" Add operator %4i" %next_index)
 
-        for n in range(n_iter):
-        	parameters[n] = 0
+        # for n in range(n_iter):
+        # 	parameters[n] = 0
 
         for n in group:
             print(" Add operator %4i " %n)
-        parameters.insert(0,0)
+
+        #===========================================
+        # parameters.insert(0,0)
+        # parameters_index.append(n_iter)
         ansatz_ops.insert(0,new_op)
         ansatz_mat.insert(0,new_mat)
-        # print(openfermion.transforms.jordan_wigner(new_op))
+        # parameters_mult.insert(0,1)
+        #===========================================
+
+        # trotter fermi ops
+        
+        NN = 0
+        MM = 0
+        LL = 0
+
+        if n_iter > 0:
+        	for k in range(0, len(parameters_index)):
+        		parameters_index[k] += 1
+
+        for tt in new_op.terms:
+            NN += 1
+
+        for t in new_op.terms:
+            MM += 1
+            tF = openfermion.FermionOperator(t,new_op.terms[t])
+            tQ = openfermion.transforms.get_sparse_operator(tF - openfermion.hermitian_conjugated(tF), n_qubits = pool.n_spin_orb)
+            ansatz_ops_t.insert(0,tF)
+            ansatz_mat_t.insert(0,tQ)
+            #================================================
+            parameters_index.insert(0,0)                   # same parameters for different terms in new fermi op
+            if MM == int(NN/2):
+                parameters_mult.insert(0,MM)
+                break
+
+        parameters.insert(0,0)
+        #====================================================
+            
+            # if LL > 0:
+            #     for k in range(0, len(parameters_index)):
+            #         parameters_index[k] += 1
+            # parameters_index.insert(0,0)                   # different parameters
+            # parameters.insert(0,0)
+            # parameters_mult.insert(0,1)
+            # LL += 1
+            # if MM == int(NN/2):
+            # 	break
+
+        #================================================================================
+
+        # # print(openfermion.transforms.jordan_wigner(new_op))
 
         
-        trial_model = tUCCSD(hamiltonian, ansatz_mat, reference_ket, parameters)
+        trial_model = ttUCCSD1(hamiltonian, ansatz_mat, ansatz_ops, ansatz_mat_t, ansatz_ops_t, reference_ket, parameters, parameters_index, parameters_mult)
         
 
         opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient, 
@@ -257,14 +425,14 @@ def adapt_vqe(geometry,
         print(" -----------New ansatz----------- ")
         # print(curr_state)
         print(" %4s %30s %12s" %("Term","Coeff","#"))
-        for si in range(len(ansatz_ops)):
-            s = ansatz_ops[si]
+        for si in range(0,len(ansatz_ops_t)):
+            s = ansatz_ops_t[si]
             opstring = ""
             for t in s.terms:
-                opstring += str(t)
-                break
-            print(" %4s %20f %10s" %(s, parameters[si], si) )
-            print(" ")
+                tt = openfermion.FermionOperator(t,s.terms[t])
+                tt -= openfermion.hermitian_conjugated(tt)
+                print(" %4s %20f %10s" %(tt, parameters[parameters_index[si]], parameters_index[si]) )
+                print(" ")
 
         # H = openfermion.get_diagonal_coulomb_hamiltonian(1j*T)
 
@@ -273,13 +441,23 @@ def adapt_vqe(geometry,
 
         # if n_iter == 0:
 
-        #     with open('BeH2_q_adapt_ng.csv', mode='w') as h4:
+        #     with open('H4_q_GSD.csv', mode='w') as h4:
         #         h4 = csv.writer(h4, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         #         h4.writerow([molecule.fci_energy-trial_model.curr_energy, n_iter])
         # else:
-        #     with open('BeH2_q_adapt_ng.csv', mode='a') as h4:
+        #     with open('H4_q_GSD.csv', mode='a') as h4:
         #         h4 = csv.writer(h4, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         #         h4.writerow([molecule.fci_energy-trial_model.curr_energy, n_iter])
+
+        # if n_iter == 0:
+
+        #     with open('H4_q_GSD_norm.csv', mode='w') as h4:
+        #         h4 = csv.writer(h4, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        #         h4.writerow([curr_norm, n_iter])
+        # else:
+        #     with open('H4_q_GSD_norm.csv', mode='a') as h4:
+        #         h4 = csv.writer(h4, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        #         h4.writerow([curr_norm, n_iter])
 
 
 # }}}
