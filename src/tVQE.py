@@ -14,7 +14,7 @@ class Variational_Ansatz:
     """
     Assumes that we have some operator, which will be applied in a specific way G*psi or exp{iG}*psi to create a trial state
     """
-    def __init__(self,_H, _G, _F, _Gt, _Ft, _ref, _params, _parameters_index, _parameters_mult):
+    def __init__(self,_H, _G, _F, _Gt, _Ft, _ref, _params, _parameters_index, _parameters_mult, _ansatz_sup_index, _ansatz_left, _ansatz_right, _ansatz_scal):
         """
         _H      : sparse matrix
         _G_ops  : list of sparse matrices - each corresponds to a variational parameter
@@ -33,6 +33,10 @@ class Variational_Ansatz:
         self.curr_params = _params 
         self.n_params = len(self.curr_params)
         self.hilb_dim = self.H.shape[0] 
+        self.sup_index = _ansatz_sup_index
+        self.left = _ansatz_left 
+        self.right = _ansatz_right 
+        self.scal = _ansatz_scal
         
         self.iter = 0
         self.energy_per_iteration = []
@@ -213,7 +217,88 @@ class tUCCSD(Variational_Ansatz):
         return np.asarray(grad)
 
 
+class A(Variational_Ansatz):
+    
+    def energy(self,params):
+        new_state = self.prepare_state(params)
+        assert(new_state.transpose().conj().dot(new_state).toarray()[0][0]-1<0.0000001)
+        energy = new_state.transpose().conj().dot(self.H.dot(new_state))[0,0]
+        assert(np.isclose(energy.imag,0))
+        self.curr_energy = energy.real
+        return energy.real
 
+    def prepare_state(self,parameters):
+        """ 
+        Prepare state:
+        exp{A1}exp{A2}exp{A3}...exp{An}|ref>
+        """
+        new_state = self.ref * 1.0
+        mm = 0
+        for k in reversed(range(0, len(parameters))):
+            if self.sup_index[k] == 0:
+                new_state = scipy.sparse.linalg.expm_multiply((parameters[k]*self.G[k]), new_state)
+            else:
+                new_state = scipy.sparse.linalg.expm_multiply(self.right[mm], new_state)
+                new_state = scipy.sparse.linalg.expm_multiply((parameters[k]*self.G[k]), new_state)
+                new_state = scipy.sparse.linalg.expm_multiply(self.left[mm], new_state)
+                new_state = self.scal[mm]*new_state
+
+                mm += 1
+        return new_state
+    
+    
+    def gradient(self,parameters):
+        """ 
+        """
+        grad = []
+        new_ket = self.prepare_state(parameters)
+        new_bra = new_ket.transpose().conj()
+        
+        hbra = new_bra.dot(self.H)
+        term = 0
+        kk = 1
+        ket = cp.deepcopy(new_ket)
+        grad = self.Recurse(parameters, grad, hbra, ket, term, kk)
+        self.der = grad
+        return np.asarray(grad)
+
+    def Recurse(self, parameters, grad, hbra, ket, term, kk):
+        if self.sup_index[term] == 0:
+            if term == 0:
+                hbra = hbra
+                ket = ket
+            elif self.sup_index[term-1] == 0:
+                hbra = (scipy.sparse.linalg.expm_multiply(-self.G[term-1]*parameters[term-1], hbra.transpose().conj())).transpose().conj()
+                ket = scipy.sparse.linalg.expm_multiply(-self.G[term-1]*parameters[term-1], ket)
+            else:
+                hbra = (scipy.sparse.linalg.expm_multiply(-self.G[term-1]*parameters[term-1], hbra.transpose().conj())).transpose().conj()
+                hbra = (scipy.sparse.linalg.expm_multiply(-self.right[-kk], hbra.transpose().conj())).transpose().conj()
+                ket = scipy.sparse.linalg.expm_multiply(-self.G[term-1]*parameters[term-1], ket)
+                ket = scipy.sparse.linalg.expm_multiply(-self.right[-kk], ket)
+                kk += 1
+        else:
+            if term == 0:
+                hbra = (scipy.sparse.linalg.expm_multiply(-self.left[-kk], hbra.transpose().conj())).transpose().conj()
+                ket = scipy.sparse.linalg.expm_multiply(-self.left[-kk], ket)
+            elif self.sup_index[term-1] == 0:
+                hbra = (scipy.sparse.linalg.expm_multiply(-self.G[term-1]*parameters[term-1], hbra.transpose().conj())).transpose().conj()
+                hbra = (scipy.sparse.linalg.expm_multiply(-self.left[-kk], hbra.transpose().conj())).transpose().conj()
+                ket = scipy.sparse.linalg.expm_multiply(-self.G[term-1]*parameters[term-1], ket)
+                ket = scipy.sparse.linalg.expm_multiply(-self.left[-kk], ket)
+            else:
+                hbra = (scipy.sparse.linalg.expm_multiply(-self.G[term-1]*parameters[term-1], hbra.transpose().conj())).transpose().conj()
+                hbra = (scipy.sparse.linalg.expm_multiply(-self.right[-kk], hbra.transpose().conj())).transpose().conj()
+                hbra = (scipy.sparse.linalg.expm_multiply(-self.left[-kk-1], hbra.transpose().conj())).transpose().conj()
+                ket = scipy.sparse.linalg.expm_multiply(-self.G[term-1]*parameters[term-1], ket)
+                ket = scipy.sparse.linalg.expm_multiply(-self.right[-kk], ket)
+                ket = scipy.sparse.linalg.expm_multiply(-self.left[-kk-1], ket)
+                kk += 1
+        grad.append((2*hbra.dot(self.G[term]).dot(ket).toarray()[0][0].real))
+
+        if term<len(parameters)-1:
+            term += 1
+            self.Recurse(parameters, grad, hbra, ket, term, kk)
+        return np.asarray(grad)
 
 
 class UCC(Variational_Ansatz):
