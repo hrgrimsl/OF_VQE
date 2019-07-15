@@ -169,6 +169,15 @@ class ttUCCSD1(Variational_Ansatz):
         return np.asarray(grad)
 
 class tUCCSD(Variational_Ansatz):
+
+    def variance(self,params):
+        new_state = self.prepare_state(params)
+        assert(new_state.transpose().conj().dot(new_state).toarray()[0][0]-1<0.0000001)
+        variance = new_state.transpose().conj().dot(self.H.dot(self.H.dot(new_state)))[0,0]
+        variance = self.curr_energy*self.curr_energy
+        assert(np.isclose(variance.imag,0))
+        self.curr_variance = variance.real
+        return variance.real
     
     def energy(self,params):
         new_state = self.prepare_state(params)
