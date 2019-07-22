@@ -33,7 +33,10 @@ class OperatorPool:
             self.cost_mat.append(transforms.get_sparse_operator(op, n_qubits=self.n))
         for op in self.mixer_ops:
             self.mixer_mat.append(transforms.get_sparse_operator(op, n_qubits=self.n))
-        print(self.cost_ops)
+
+        self.spmat_ops = []
+        for op in self.pool_ops:
+            self.spmat_ops.append(transforms.get_sparse_operator(op, n_qubits=self.n))
         return
 
 class qaoa(OperatorPool):
@@ -41,6 +44,8 @@ class qaoa(OperatorPool):
 
         A = QubitOperator('Z0 Z1', 0)
         B = QubitOperator('X0', 0)
+        C = QubitOperator('Y0', 0)
+        D = QubitOperator('Z0 Y1', 0)
 
         self.pool_ops = []
 
@@ -58,8 +63,17 @@ class qaoa(OperatorPool):
             B += QubitOperator('X%d' % i, 1j)
         self.mixer_ops.append(B)
 
+        for i in range(0, self.n):
+            C += QubitOperator('Y%d' % i, 1j)
+
+        for i in range(0,self.n):
+            for j in range(i+1,self.n):
+                D += QubitOperator('Z%d Y%d' % (i, j) , 1j)
+
         self.pool_ops.append(A)
         self.pool_ops.append(B)
+        self.pool_ops.append(C)
+        self.pool_ops.append(D)
 
         self.n_ops = len(self.pool_ops)
 
