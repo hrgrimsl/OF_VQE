@@ -30,6 +30,11 @@ def qaoa(n,
     hamiltonian = pool.cost_mat[0] * 1j
 
     w, v = scipy.sparse.linalg.eigs(hamiltonian)
+    print('G', G)
+    pool.init(n, G)
+    pool.generate_SparseMatrix()
+
+    w, v = scipy.sparse.linalg.eigs(pool.cost_mat[0]*1j)
     GS = scipy.sparse.csc_matrix(v[:,w.argmin()]).transpose().conj()
     GS_energy = min(w)
 
@@ -67,6 +72,7 @@ def qaoa(n,
         min_options = {'gtol': theta_thresh, 'disp': False}
 
         trial_model = tUCCSD(hamiltonian, ansatz_mat, reference_ket, parameters)
+
 
         opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient,
                                              options=min_options, method='Nelder-Mead', callback=trial_model.callback)
@@ -142,7 +148,7 @@ def q_adapt_vqe(n,
             com = com.real
 
             opstring = ""
-            for t in pool.pool_ops[op_trial].terms:
+            for t in pool.fermi_ops[op_trial].terms:
                 opstring += str(t)
                 break
 
@@ -202,7 +208,7 @@ def q_adapt_vqe(n,
         new_mat = pool.spmat_ops[next_index]
 
         for n in range(len(group)):
-            new_op += Sign[n] * pool.pool_ops[group[n]]
+            new_op += Sign[n] * pool.fermi_ops[group[n]]
             new_mat += Sign[n] * pool.spmat_ops[group[n]]
 
         print(" Add operator %4i" % next_index)
