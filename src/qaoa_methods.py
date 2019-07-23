@@ -16,8 +16,8 @@ from openfermion import *
 
 def qaoa(n,
          g,
-         adapt_thresh=1e-3,
-         theta_thresh=1e-7,
+         adapt_thresh=1e-5,
+         theta_thresh=1e-12,
          layer = 1,
          pool=operator_pools.qaoa(),
          ):
@@ -30,11 +30,6 @@ def qaoa(n,
     hamiltonian = pool.cost_mat[0] * 1j
 
     w, v = scipy.sparse.linalg.eigs(hamiltonian)
-    print('G', G)
-    pool.init(n, G)
-    pool.generate_SparseMatrix()
-
-    w, v = scipy.sparse.linalg.eigs(pool.cost_mat[0]*1j)
     GS = scipy.sparse.csc_matrix(v[:,w.argmin()]).transpose().conj()
     GS_energy = min(w)
 
@@ -85,10 +80,10 @@ def qaoa(n,
 
 def q_adapt_vqe(n,
          g,
-         adapt_thresh=1e-3,
+         adapt_thresh=1e-4,
          theta_thresh=1e-7,
                 layer = 1,
-         adapt_maxiter = 1,
+         adapt_maxiter = 100,
          pool=operator_pools.qaoa(),
          adapt_conver = "norm"
                 ):
@@ -100,7 +95,7 @@ def q_adapt_vqe(n,
 
     hamiltonian = pool.cost_mat[0]*1j
 
-    w, v = scipy.sparse.linalg.eigs(pool.cost_mat[0] * 1j)
+    w, v = scipy.sparse.linalg.eigs(hamiltonian)
     GS = scipy.sparse.csc_matrix(v[:, w.argmin()]).transpose().conj()
     GS_energy = min(w)
 
@@ -148,7 +143,7 @@ def q_adapt_vqe(n,
             com = com.real
 
             opstring = ""
-            for t in pool.fermi_ops[op_trial].terms:
+            for t in pool.pool_ops[op_trial].terms:
                 opstring += str(t)
                 break
 
@@ -178,7 +173,7 @@ def q_adapt_vqe(n,
             exit()
 
         if converged:
-            pickle.dump(ansatz_ops, open('./h4_ansatz.p', 'wb'))
+            # pickle.dump(ansatz_ops, open('./h4_ansatz.p', 'wb'))
             print(" Ansatz Growth Converged!")
             print(" Number of operators in ansatz: ", len(ansatz_ops))
             print(" *Finished: %20.12f" % trial_model.curr_energy)
@@ -208,7 +203,7 @@ def q_adapt_vqe(n,
         new_mat = pool.spmat_ops[next_index]
 
         for n in range(len(group)):
-            new_op += Sign[n] * pool.fermi_ops[group[n]]
+            new_op += Sign[n] * pool.pool_ops[group[n]]
             new_mat += Sign[n] * pool.spmat_ops[group[n]]
 
         print(" Add operator %4i" % next_index)
@@ -219,7 +214,7 @@ def q_adapt_vqe(n,
         for n in group:
             print(" Add operator %4i " % n)
 
-        parameters.insert(0, 1)
+        parameters.insert(0, 0)
         ansatz_ops.insert(0, new_op)
         ansatz_mat.insert(0, new_mat)
 

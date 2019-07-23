@@ -68,7 +68,10 @@ class qaoa(OperatorPool):
 
         for i in range(0,self.n):
             for j in range(i+1,self.n):
-                D += QubitOperator('Z%d Y%d' % (i, j) , 1j)
+                D = QubitOperator('Z%d Y%d' % (i, j) , 1j)
+                self.pool_ops.append(D)
+                D = QubitOperator('X%d Y%d' % (i, j), 1j)
+                self.pool_ops.append(D)
 
         self.pool_ops.append(A)
         self.pool_ops.append(B)

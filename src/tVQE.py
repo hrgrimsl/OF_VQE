@@ -21,7 +21,7 @@ class Variational_Ansatz:
         _params : initialized list of parameters
         """
 
-        self.H = _H*1j
+        self.H = _H
         self.G = _G
         self.ref = cp.deepcopy(_ref)
         self.curr_params = _params 
