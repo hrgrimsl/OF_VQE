@@ -221,7 +221,7 @@ def q_adapt_vqe(n,
         trial_model = tUCCSD(hamiltonian, ansatz_mat, reference_ket, parameters)
 
         opt_result = scipy.optimize.minimize(trial_model.energy, parameters, jac=trial_model.gradient,
-                                             options=min_options, method='Nelder-Mead', callback=trial_model.callback)
+                                             options=min_options, method='BFGS', callback=trial_model.callback)
 
         # print(ansatz_ops)
 
