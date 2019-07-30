@@ -72,11 +72,12 @@ class qaoa(OperatorPool):
                 self.pool_ops.append(D)
                 D = QubitOperator('X%d Y%d' % (i, j), 1j)
                 self.pool_ops.append(D)
+                D = QubitOperator('Z%d Z%d' % (i, j), 1j)
+                self.pool_ops.append(D)
 
         self.pool_ops.append(A)
         self.pool_ops.append(B)
         self.pool_ops.append(C)
-        self.pool_ops.append(D)
 
         self.n_ops = len(self.pool_ops)
 
