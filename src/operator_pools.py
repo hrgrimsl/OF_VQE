@@ -66,6 +66,13 @@ class qaoa(OperatorPool):
         for i in range(0, self.n):
             C += QubitOperator('Y%d' % i, 1j)
 
+        for i in range(0, self.n):
+            X = QubitOperator('X%d' % i, 1j)
+        self.mixer_ops.append(B)
+
+        for i in range(0, self.n):
+            Y = QubitOperator('Y%d' % i, 1j)
+
         for i in range(0,self.n):
             for j in range(i+1,self.n):
                 D = QubitOperator('Z%d Y%d' % (i, j) , 1j)
@@ -74,10 +81,19 @@ class qaoa(OperatorPool):
                 self.pool_ops.append(D)
                 D = QubitOperator('Z%d Z%d' % (i, j), 1j)
                 self.pool_ops.append(D)
+                D = QubitOperator('X%d X%d' % (i, j), 1j)
+                self.pool_ops.append(D)
+                D = QubitOperator('X%d Z%d' % (i, j), 1j)
+                self.pool_ops.append(D)
+                D = QubitOperator('Y%d Y%d' % (i, j), 1j)
+                self.pool_ops.append(D)
 
-        self.pool_ops.append(A)
-        self.pool_ops.append(B)
-        self.pool_ops.append(C)
+        # self.pool_ops.append(A)
+        # self.pool_ops.append(B)
+        # self.pool_ops.append(C)
+
+        self.pool_ops.append(X)
+        self.pool_ops.append(Y)
 
         self.n_ops = len(self.pool_ops)
 
