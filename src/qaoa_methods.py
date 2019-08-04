@@ -7,6 +7,8 @@ import copy
 import random
 import sys
 import pickle
+from  openfermionprojectq  import  uccsd_trotter_engine, TimeEvolution
+from  projectq.backends  import CommandPrinter
 
 import operator_pools
 from tVQE import *
@@ -383,6 +385,20 @@ def q_adapt_vqe(n,
                 print(" %4s %20f %10s" % (s, parameters[si], si))
                 print(" ")
 
+                compiler_engine = uccsd_trotter_engine(compiler_backend=CommandPrinter())
+                wavefunction = compiler_engine.allocate_qureg(n)
+
+                H = 1j * s  # Qubits -pool
+
+                # Trotter step parameters.
+                time = parameters[si]
+
+                evolution_operator = TimeEvolution(time, H)
+
+                evolution_operator | wavefunction
+
+                compiler_engine.flush()
+
             break
 
         new_op = pool.pool_ops[next_index]
@@ -564,6 +580,20 @@ def q_adapt_vqe_min(n,
                     break
                 print(" %4s %20f %10s" % (s, parameters[si], si))
                 print(" ")
+
+                compiler_engine = uccsd_trotter_engine(compiler_backend=CommandPrinter())
+                wavefunction = compiler_engine.allocate_qureg(n)
+
+                H = 1j * s  # Qubits -pool
+
+                # Trotter step parameters.
+                time = parameters[si]
+
+                evolution_operator = TimeEvolution(time, H)
+
+                evolution_operator | wavefunction
+
+                compiler_engine.flush()
 
             break
 
@@ -768,3 +798,17 @@ def adapt_qaoa(n,
             break
         print(" %4s %20f %10s" % (s, parameters[si], si))
         print(" ")
+
+        compiler_engine = uccsd_trotter_engine(compiler_backend=CommandPrinter())
+        wavefunction = compiler_engine.allocate_qureg(n)
+
+        H = 1j * s  # Qubits -pool
+
+        # Trotter step parameters.
+        time = parameters[si]
+
+        evolution_operator = TimeEvolution(time, H)
+
+        evolution_operator | wavefunction
+
+        compiler_engine.flush()
