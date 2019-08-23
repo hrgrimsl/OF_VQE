@@ -59,16 +59,15 @@ class qaoa(OperatorPool):
         self.cost_ops.append(A)
 
         self.mixer_ops = []
-        for i in range(0, self.n):
-            B += QubitOperator('X%d' % i, 1j)
-        self.mixer_ops.append(B)
+        # for i in range(0, self.n):
+        #     B += QubitOperator('X%d' % i, 1j)
+        # self.mixer_ops.append(B)
 
         for i in range(0, self.n):
             C += QubitOperator('Y%d' % i, 1j)
 
         for i in range(0, self.n):
             X = QubitOperator('X%d' % i, 1j)
-        self.mixer_ops.append(B)
 
         for i in range(0, self.n):
             Y = QubitOperator('Y%d' % i, 1j)
