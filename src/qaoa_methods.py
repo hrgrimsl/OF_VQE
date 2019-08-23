@@ -13,6 +13,8 @@ from  projectq.backends  import CommandPrinter
 import operator_pools
 from tVQE import *
 
+import pickle
+
 from openfermion import *
 
 
@@ -660,6 +662,8 @@ def adapt_qaoa(n,
     pool.generate_SparseMatrix()
 
     hamiltonian = pool.cost_mat[0] * 1j
+    H = pool.cost_ops[0] * 1j
+    pickle.dump(H, open('./hamiltonian.p', 'wb'))
 
     w, v = scipy.sparse.linalg.eigs(hamiltonian)
     GS = scipy.sparse.csc_matrix(v[:,w.argmin()]).transpose().conj()
@@ -781,6 +785,8 @@ def adapt_qaoa(n,
     print(' Error:', GS_energy.real - trial_model.curr_energy)
     print(" -----------Final ansatz----------- ")
     print(" %4s %30s %12s" % ("Term", "Coeff", "#"))
+    pickle.dump(ansatz_ops, open('./ansatz.p', 'wb'))
+    pickle.dump(parameters, open('./paremeter.p', 'wb'))
     new_state = reference_ket
     E_step = []
     for k in reversed(range(0, len(parameters))):
