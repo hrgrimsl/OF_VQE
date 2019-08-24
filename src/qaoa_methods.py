@@ -33,7 +33,7 @@ def qaoa(n,
 
     hamiltonian = pool.cost_mat[0] * 1j
 
-    w, v = scipy.sparse.linalg.eigs(hamiltonian)
+    w, v = scipy.sparse.linalg.eigs(hamiltonian, which='SR')
     GS = scipy.sparse.csc_matrix(v[:,w.argmin()]).transpose().conj()
     GS_energy = min(w)
 
@@ -99,7 +99,7 @@ def q_adapt_vqe_p1(n,
 
     hamiltonian = pool.cost_mat[0]*1j
 
-    w, v = scipy.sparse.linalg.eigs(hamiltonian)
+    w, v = scipy.sparse.linalg.eigs(hamiltonian, which='SR')
     GS = scipy.sparse.csc_matrix(v[:, w.argmin()]).transpose().conj()
     GS_energy = min(w)
 
@@ -284,7 +284,7 @@ def q_adapt_vqe(n,
 
     hamiltonian = pool.cost_mat[0]*1j
 
-    w, v = scipy.sparse.linalg.eigs(hamiltonian)
+    w, v = scipy.sparse.linalg.eigs(hamiltonian, which='SR')
     GS = scipy.sparse.csc_matrix(v[:, w.argmin()]).transpose().conj()
     GS_energy = min(w)
 
@@ -469,7 +469,7 @@ def q_adapt_vqe_min(n,
 
     hamiltonian = pool.cost_mat[0]*1j
 
-    w, v = scipy.sparse.linalg.eigs(hamiltonian)
+    w, v = scipy.sparse.linalg.eigs(hamiltonian, which='SR')
     GS = scipy.sparse.csc_matrix(v[:, w.argmin()]).transpose().conj()
     GS_energy = min(w)
 
@@ -663,11 +663,12 @@ def adapt_qaoa(n,
 
     hamiltonian = pool.cost_mat[0] * 1j
     H = pool.cost_ops[0] * 1j
-    pickle.dump(H, open('./hamiltonian.p', 'wb'))
+    # pickle.dump(H, open('./hamiltonian.p', 'wb'))
 
-    w, v = scipy.sparse.linalg.eigs(hamiltonian)
-    GS = scipy.sparse.csc_matrix(v[:,w.argmin()]).transpose().conj()
+    w, v = scipy.sparse.linalg.eigs(hamiltonian, which='SR')
+    GS = scipy.sparse.csc_matrix(v[:, w.argmin()]).transpose().conj()
     GS_energy = min(w)
+
 
     print('energy:', GS_energy.real)
     print('maxcut objective:', GS_energy.real + pool.shift.real )
@@ -785,8 +786,8 @@ def adapt_qaoa(n,
     print(' Error:', GS_energy.real - trial_model.curr_energy)
     print(" -----------Final ansatz----------- ")
     print(" %4s %30s %12s" % ("Term", "Coeff", "#"))
-    pickle.dump(ansatz_ops, open('./ansatz.p', 'wb'))
-    pickle.dump(parameters, open('./paremeter.p', 'wb'))
+    # pickle.dump(ansatz_ops, open('./ansatz.p', 'wb'))
+    # pickle.dump(parameters, open('./paremeter.p', 'wb'))
     new_state = reference_ket
     E_step = []
     for k in reversed(range(0, len(parameters))):
