@@ -64,7 +64,7 @@ def adapt_vqe(geometry,
     HJW = openfermion.transforms.jordan_wigner(hamiltonian_op)
     pickle.dump(HJW, open('./h4_hamiltonian.p','wb'))
 
-    # print(HJW)
+    print(HJW)
 
     #Thetas
     parameters = []
@@ -309,7 +309,8 @@ def q_adapt_vqe(geometry,
     # print("H",hamiltonian)
     #  print(hamiltonian[:,240])
     HJW = openfermion.transforms.jordan_wigner(hamiltonian_op)
-    pickle.dump(HJW, open('./h4_hamiltonian.p','wb'))
+    # print(HJW)
+    # pickle.dump(HJW, open('./h4_hamiltonian.p','wb'))
 
     w, v = scipy.sparse.linalg.eigs(hamiltonian, which='SR')
     GS = scipy.sparse.csc_matrix(v[:,w.argmin()]).transpose().conj()

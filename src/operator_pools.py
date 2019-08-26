@@ -2,6 +2,8 @@ import openfermion
 import numpy as np
 import copy as cp
 
+import random
+
 from openfermion import *
 
 
@@ -157,6 +159,65 @@ class singlet_GSD(OperatorPool):
         print(" Number of operators: ", self.n_ops)
         return 
 
+class anti_com(OperatorPool):
+    def generate_SQ_Operators(self):
+
+        self.bin_pool = []
+
+        for i in range(2 ** 4):
+            b_string = [int(j) for j in bin(i)[2:].zfill(4)]
+            self.bin_pool.append(b_string)
+
+        self.z = []
+        self.x = []
+
+        for i in self.bin_pool:
+            for j in self.bin_pool:
+                if sum(i[k] * j[k] for k in range(4)) % 2 == 1:
+                    self.z.append(i)
+                    self.x.append(j)
+
+        print("total number of antisymmetric ops :"+str(len(self.z)))
+
+        nn = random.randint(0, 2 ** 4 - 1)
+
+        self.z_f1 = []
+        self.x_f1 = []
+
+        self.z_f1.append(self.z[nn])
+        self.x_f1.append(self.x[nn])
+
+        for i in range(len(self.z)):
+            z1 = [(self.z[i][k] + self.z[nn][k]) % 2 for k in range(4)]
+            x1 = [(self.x[i][k] + self.x[nn][k]) % 2 for k in range(4)]
+            if sum(z1[k] * x1[k] for k in range(4)) % 2 == 1:
+                self.z_f1.append(self.z[i])
+                self.x_f1.append(self.x[i])
+
+        print(len(self.z_f1))
+
+        for i in range(1, 2 ** 4 - 1):
+            self.z_f2 = self.z_f1[:i+1]
+            self.x_f2 = self.x_f1[:i+1]
+            print(len(self.z_f2))
+            for j in range(i+1, len(self.z_f1)):
+                z1 = [(self.z_f1[i][k] + self.z_f1[j][k]) % 2 for k in range(4)]
+                x1 = [(self.x_f1[i][k] + self.x_f1[j][k]) % 2 for k in range(4)]
+                if sum(z1[k] * x1[k] for k in range(4)) % 2 == 1:
+                    jj = 0
+                    for m in range(0, i):
+                        if (z1 != self.z_f2[m]) or (x1 != self.x_f2[m]):
+                            jj += 1
+                    if jj == 0:
+                        self.z_f2.append(self.z_f1[j])
+                        self.x_f2.append(self.x_f1[j])
+
+            self.z_f1 = self.z_f2
+            self.x_f1 = self.x_f2
+
+        for i in range(len(self.z_f2)):
+            print(self.z_f2[i],self.x_f2[i])
+
 class singlet_SD(OperatorPool):
     def generate_SQ_Operators(self):
         """
@@ -280,18 +341,18 @@ class qubits(OperatorPool):
         for p in range(0,2*self.n_orb):
             for q in range(p+1,2*self.n_orb):
 
-                XX = QubitOperator('X%d X%d'% (p, q), 0+1j)
+                # XX = QubitOperator('X%d X%d'% (p, q), 0+1j)
                 XY = QubitOperator('X%d Y%d'% (p, q), 0+1j)
                 YX = QubitOperator('Y%d X%d'% (p, q), 0+1j)
-                XZ = QubitOperator('X%d Z%d'% (p, q), 0+1j)
-                YZ = QubitOperator('Y%d Z%d'% (p, q), 0+1j)
-                YY = QubitOperator('Y%d Y%d'% (p, q), 0+1j)
+                # XZ = QubitOperator('X%d Z%d'% (p, q), 0+1j)
+                # YZ = QubitOperator('Y%d Z%d'% (p, q), 0+1j)
+                # YY = QubitOperator('Y%d Y%d'% (p, q), 0+1j)
 
-                self.fermi_ops.append(XX)
+                # self.fermi_ops.append(XX)
                 self.fermi_ops.append(YX)
-                self.fermi_ops.append(XZ)
-                self.fermi_ops.append(YZ)
-                self.fermi_ops.append(YY)
+                # self.fermi_ops.append(XZ)
+                # self.fermi_ops.append(YZ)
+                # self.fermi_ops.append(YY)
                 self.fermi_ops.append(XY) 
 
 
@@ -301,19 +362,19 @@ class qubits(OperatorPool):
                 for k in range(j+1, 2*self.n_orb):
 
                     YXZ = QubitOperator('Y%d X%d Z%d'% (i, j, k), 1j)  
-                    # XYZ = QubitOperator('X%d Y%d Z%d'% (i, j, k), 1j)
+                    XYZ = QubitOperator('X%d Y%d Z%d'% (i, j, k), 1j)
                     XZY = QubitOperator('X%d Z%d Y%d'% (i, j, k), 1j)
-                    # YZX = QubitOperator('Y%d Z%d X%d'% (i, j, k), 1j)
+                    YZX = QubitOperator('Y%d Z%d X%d'% (i, j, k), 1j)
                     ZXY = QubitOperator('Z%d X%d Y%d'% (i, j, k), 1j)
-                    # ZYX = QubitOperator('Z%d X%d Y%d'% (i, j, k), 1j)
+                    ZYX = QubitOperator('Z%d X%d Y%d'% (i, j, k), 1j)
                     # ZZZ = QubitOperator('Z%d Z%d Z%d'% (i, j, k), 1j)
   
-                    # self.fermi_ops.append(XYZ)
+                    self.fermi_ops.append(XYZ)
                     self.fermi_ops.append(YXZ)
                     self.fermi_ops.append(XZY)
-                    # self.fermi_ops.append(YZX)
+                    self.fermi_ops.append(YZX)
                     self.fermi_ops.append(ZXY)
-                    # self.fermi_ops.append(ZYX)
+                    self.fermi_ops.append(ZYX)
                     # self.fermi_ops.append(ZZZ)
 
                     # XXY = QubitOperator('X%d X%d Y%d'% (i, j, k), 1j)
