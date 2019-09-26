@@ -163,9 +163,12 @@ class anti_com(OperatorPool):
     def generate_SQ_Operators(self):
 
         self.bin_pool = []
+        self.fermi_ops = []
 
-        for i in range(2 ** 4):
-            b_string = [int(j) for j in bin(i)[2:].zfill(4)]
+        ii = 8
+
+        for i in range(2 ** ii):
+            b_string = [int(j) for j in bin(i)[2:].zfill(ii)]
             self.bin_pool.append(b_string)
 
         self.z = []
@@ -173,50 +176,77 @@ class anti_com(OperatorPool):
 
         for i in self.bin_pool:
             for j in self.bin_pool:
-                if sum(i[k] * j[k] for k in range(4)) % 2 == 1:
+                if sum(i[k] * j[k] for k in range(ii)) % 2 == 1:
                     self.z.append(i)
                     self.x.append(j)
 
+        combined = list(zip(self.z, self.x))
+
         print("total number of antisymmetric ops :"+str(len(self.z)))
 
-        nn = random.randint(0, 2 ** 4 - 1)
+        print("Georgi terms")
 
-        self.z_f1 = []
-        self.x_f1 = []
+        self.georgi_z = []
+        self.georgi_x = []
 
-        self.z_f1.append(self.z[nn])
-        self.x_f1.append(self.x[nn])
+        zz = 0
 
-        for i in range(len(self.z)):
-            z1 = [(self.z[i][k] + self.z[nn][k]) % 2 for k in range(4)]
-            x1 = [(self.x[i][k] + self.x[nn][k]) % 2 for k in range(4)]
-            if sum(z1[k] * x1[k] for k in range(4)) % 2 == 1:
-                self.z_f1.append(self.z[i])
-                self.x_f1.append(self.x[i])
+        for i in range(ii):
+            zz += 2 ** i
+            xx = 2 ** i
+            b_string_z = [int(j) for j in bin(zz)[2:].zfill(ii)]
+            b_string_x = [int(j) for j in bin(xx)[2:].zfill(ii)]
+            self.georgi_z.append(b_string_z)
+            self.georgi_x.append(b_string_x)
 
-        print(len(self.z_f1))
+        for i in range(len(self.georgi_z)):
+            print(self.georgi_z[i], self.georgi_x[i])
 
-        for i in range(1, 2 ** 4 - 1):
-            self.z_f2 = self.z_f1[:i+1]
-            self.x_f2 = self.x_f1[:i+1]
-            print(len(self.z_f2))
-            for j in range(i+1, len(self.z_f1)):
-                z1 = [(self.z_f1[i][k] + self.z_f1[j][k]) % 2 for k in range(4)]
-                x1 = [(self.x_f1[i][k] + self.x_f1[j][k]) % 2 for k in range(4)]
-                if sum(z1[k] * x1[k] for k in range(4)) % 2 == 1:
-                    jj = 0
-                    for m in range(0, i):
-                        if (z1 != self.z_f2[m]) or (x1 != self.x_f2[m]):
-                            jj += 1
-                    if jj == 0:
-                        self.z_f2.append(self.z_f1[j])
-                        self.x_f2.append(self.x_f1[j])
+        self.pool_z = self.georgi_z
+        self.pool_x = self.georgi_x
 
-            self.z_f1 = self.z_f2
-            self.x_f1 = self.x_f2
+        max_len = 0
 
-        for i in range(len(self.z_f2)):
-            print(self.z_f2[i],self.x_f2[i])
+        for k in range(100):
+            random.shuffle(combined)
+            self.z[:], self.x[:] = zip(*combined)
+            for i in range(len(self.z)):
+                kk = 0
+                for j in range(len(self.pool_z)):
+                    z1 = [(self.z[i][k] + self.pool_z[j][k]) % 2 for k in range(ii)]
+                    x1 = [(self.x[i][k] + self.pool_x[j][k]) % 2 for k in range(ii)]
+                    if sum(z1[k] * x1[k] for k in range(ii)) % 2 == 0:
+                        kk += 1
+                if kk == 0:
+                    self.pool_z.append(self.z[i])
+                    self.pool_x.append(self.x[i])
+            length = len(self.pool_z)
+            if length > max_len:
+                max_len = length
+                self.georgi_z = self.pool_z
+                self.georgi_x = self.pool_x
+
+        print('size of set %12i' % (len(self.georgi_z)))
+
+        for i in range(len(self.georgi_z)):
+            print(self.georgi_z[i], self.georgi_x[i])
+
+        for i in range(len(self.georgi_z)):
+            pauli_string = ''
+            for j in range(ii):
+                if self.georgi_z[i][j] == 0:
+                    if self.georgi_x[i][j] == 1:
+                        pauli_string += 'X%d ' % j
+                if self.georgi_z[i][j] == 1:
+                    if self.georgi_x[i][j] == 0:
+                        pauli_string += 'Z%d ' % j
+                    else:
+                        pauli_string += 'Y%d ' % j
+            A = QubitOperator(pauli_string, 0+1j)
+            print(self.georgi_z[i], self.georgi_x[i], A)
+            self.fermi_ops.append(A)
+
+        self.n_ops = len(self.fermi_ops)
 
 class singlet_SD(OperatorPool):
     def generate_SQ_Operators(self):
