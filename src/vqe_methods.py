@@ -296,23 +296,6 @@ def q_adapt_vqe(geometry,
     
     pool.init(molecule)
 
-    over_mat = np.zeros(pool.n_ops)
-
-    vec = np.random.rand(pool.n_ops,1)
-
-    norm = 0
-
-    for i in vec:
-        norm += i*i
-
-    vec = np.true_divide(vec, np.sqrt(norm))
-    vec = scipy.sparse.csc_matrix(vec)
-
-    for i in range(pool.n_ops):
-        for j in range(pool.n_ops):
-            over_mat[i, j] = vec.transpose().conjugate().dot(pool.spmat_ops[i].dot(pool.spmat_ops[j].dot(vec)))
-
-
     print(" Basis: ", basis)
 
     print(' HF energy      %20.16f au' %(molecule.hf_energy))
@@ -346,6 +329,20 @@ def q_adapt_vqe(geometry,
     Sign = []
 
     pool.generate_SparseMatrix()
+
+    over_mat = np.zeros(pool.n_ops)
+    vec = np.random.rand(pool.n_ops, 1)
+    norm = 0
+
+    for i in vec:
+        norm += i * i
+
+    vec = np.true_divide(vec, np.sqrt(norm))
+    vec = scipy.sparse.csc_matrix(vec)
+
+    for i in range(pool.n_ops):
+        for j in range(pool.n_ops):
+            over_mat[i, j] = vec.transpose().conjugate().dot(pool.spmat_ops[i].dot(pool.spmat_ops[j].dot(vec)))
    
     ansatz_ops = []     #SQ operator strings in the ansatz
     ansatz_mat = []     #Sparse Matrices for operators in ansatz
