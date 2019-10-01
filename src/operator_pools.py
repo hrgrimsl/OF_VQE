@@ -355,35 +355,36 @@ class qubits(OperatorPool):
             X = QubitOperator('X%d'% p, 0+1j)
             Y = QubitOperator('Y%d'% p, 0+1j)
 
-            self.fermi_ops.append(X)
+            # self.fermi_ops.append(Y)
+            # self.fermi_ops.append(X)
         for p in range(0,2*self.n_orb):
             Z = QubitOperator('Z%d'% p, 0+1j)
 
-            self.fermi_ops.append(Z)
+            # self.fermi_ops.append(Z)
 
         for p in range(0,2*self.n_orb):
 
             for q in range(p+1,2*self.n_orb):
 
                 ZZ = QubitOperator('Z%d Z%d'% (p, q), 0+1j)
-                self.fermi_ops.append(ZZ)
+                # self.fermi_ops.append(ZZ)
 
         for p in range(0,2*self.n_orb):
             for q in range(p+1,2*self.n_orb):
 
-                # XX = QubitOperator('X%d X%d'% (p, q), 0+1j)
+                XX = QubitOperator('X%d X%d'% (p, q), 0+1j)
                 XY = QubitOperator('X%d Y%d'% (p, q), 0+1j)
                 YX = QubitOperator('Y%d X%d'% (p, q), 0+1j)
-                # XZ = QubitOperator('X%d Z%d'% (p, q), 0+1j)
-                # YZ = QubitOperator('Y%d Z%d'% (p, q), 0+1j)
-                # YY = QubitOperator('Y%d Y%d'% (p, q), 0+1j)
+                XZ = QubitOperator('X%d Z%d'% (p, q), 0+1j)
+                YZ = QubitOperator('Y%d Z%d'% (p, q), 0+1j)
+                YY = QubitOperator('Y%d Y%d'% (p, q), 0+1j)
 
                 # self.fermi_ops.append(XX)
                 self.fermi_ops.append(YX)
                 # self.fermi_ops.append(XZ)
                 # self.fermi_ops.append(YZ)
                 # self.fermi_ops.append(YY)
-                self.fermi_ops.append(XY) 
+                # self.fermi_ops.append(XY) 
 
 
         for i in range(0,2*self.n_orb):
@@ -400,11 +401,11 @@ class qubits(OperatorPool):
                     # ZZZ = QubitOperator('Z%d Z%d Z%d'% (i, j, k), 1j)
   
                     self.fermi_ops.append(XYZ)
-                    self.fermi_ops.append(YXZ)
+                    # self.fermi_ops.append(YXZ)
                     self.fermi_ops.append(XZY)
-                    self.fermi_ops.append(YZX)
+                    # self.fermi_ops.append(YZX)
                     self.fermi_ops.append(ZXY)
-                    self.fermi_ops.append(ZYX)
+                    # self.fermi_ops.append(ZYX)
                     # self.fermi_ops.append(ZZZ)
 
                     # XXY = QubitOperator('X%d X%d Y%d'% (i, j, k), 1j)
@@ -423,9 +424,9 @@ class qubits(OperatorPool):
                         YYYX = QubitOperator('Y%d Y%d Y%d X%d'% (p, q, r, s), 1j)
 
                         self.fermi_ops.append(XYYY)
-                        self.fermi_ops.append(YXYY)
-                        self.fermi_ops.append(YYXY)
-                        self.fermi_ops.append(YYYX)
+                        # self.fermi_ops.append(YXYY)
+                        # self.fermi_ops.append(YYXY)
+                        # self.fermi_ops.append(YYYX)
 
                         # XXXY = QubitOperator('X%d X%d X%d Y%d'% (p, q, r, s), 1j)
                         # YXXX = QubitOperator('Y%d X%d X%d X%d'% (p, q, r, s), 1j)
