@@ -73,6 +73,25 @@ def adapt_vqe(geometry,
     Sign = []
 
     pool.generate_SparseMatrix()
+
+    over_mat = np.zeros(shape=(pool.n_ops, pool.n_ops))
+    vec = np.random.rand(2 ** pool.n_spin_orb, 1)
+    print(vec)
+    norm = 0
+
+    for i in vec:
+        norm += i * i
+
+    vec = np.true_divide(vec, np.sqrt(norm))
+    vec = scipy.sparse.csc_matrix(vec)
+
+    for i in range(pool.n_ops):
+        for j in range(pool.n_ops):
+            over_mat[i, j] = vec.transpose().conjugate().dot(pool.spmat_ops[i].dot(pool.spmat_ops[j].dot(vec)))[0,0]
+
+    rank = np.linalg.matrix_rank(over_mat)
+
+    print("rank =", rank)
    
     ansatz_ops = []     #SQ operator strings in the ansatz
     ansatz_mat = []     #Sparse Matrices for operators in ansatz
