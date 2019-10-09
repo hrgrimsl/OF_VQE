@@ -294,8 +294,8 @@ def q_adapt_vqe(geometry,
         multiplicity    = 1,
         charge          = 0,
         adapt_conver    = 'norm',
-        adapt_thresh    = 1e-7,
-        theta_thresh    = 1e-12,
+        adapt_thresh    = 1e-4,
+        theta_thresh    = 1e-9,
         adapt_maxiter   = 400,
         pool            = operator_pools.qubits(),
         spin_adapt      = True,
@@ -451,7 +451,7 @@ def q_adapt_vqe(geometry,
                 break
        
             # if abs(com) > adapt_thresh:
-            print(" %4i %40s %12.8f" %(op_trial, opstring, com) )
+            print(" %4i %40s %12.8f" %(op_trial, pool.fermi_ops[op_trial], com) )
 
             curr_norm += com*com
 

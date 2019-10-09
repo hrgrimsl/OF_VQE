@@ -271,30 +271,30 @@ class GSD_extract(OperatorPool):
             pauli = openfermion.transforms.jordan_wigner(i)
             for line in pauli.terms:
                 line = str(line)
-                print(line)
-                bin1 = np.zeros((2 * n,), dtype=int)
+                # print(line)
+                Bin = np.zeros((2 * n,), dtype=int)
                 X_pat_1 = re.compile("(\d{,2}), 'X'")
                 X_1 = X_pat_1.findall(line)
                 if X_1:
                     for i in X_1:
                         k = int(i)
-                        bin1[n + k] = 1
+                        Bin[n + k] = 1
                 Y_pat_1 = re.compile("(\d{,2}), 'Y'")
                 Y_1 = Y_pat_1.findall(line)
                 if Y_1:
                     for i in Y_1:
                         k = int(i)
-                        bin1[n + k] = 1
-                        bin1[k] = 1
+                        Bin[n + k] = 1
+                        Bin[k] = 1
                 Z_pat_1 = re.compile("(\d{,2}), 'Z'")
                 Z_1 = Z_pat_1.findall(line)
                 if Z_1:
                     for i in Z_1:
                         k = int(i)
-                        bin1[k] = 1
-                print(bin1)
-                index = int("".join(str(x) for x in bin1), 2)
-                print("index", index)
+                        Bin[k] = 1
+                # print(Bin)
+                index = int("".join(str(x) for x in Bin), 2)
+                # print("index", index)
 
                 pool_vec[index] = int(1)
 
@@ -308,7 +308,6 @@ class GSD_extract(OperatorPool):
 
         for i in nz:
             p = int(i)
-            print(p)
             bi = bin(p)
             b_string = [int(j) for j in bi[2:].zfill(m)]
             pauli_string = ''
@@ -324,7 +323,14 @@ class GSD_extract(OperatorPool):
                     else:
                         pauli_string += 'Y%d ' % k
                         flip.append(k)
+            flip.sort()
+            z_string = list(range(flip[0] + 1,flip[1]))
+            if len(flip) == 4:
+            	for i in range(flip[2] + 1, flip[3]):
+            		z_string.append(i)
+            print("Z string:", z_string)
             A = QubitOperator(pauli_string, 0 + 1j)
+            print("Pauli:", pauli_string)
             self.fermi_ops.append(A)
 
         self.n_ops = len(self.fermi_ops)
