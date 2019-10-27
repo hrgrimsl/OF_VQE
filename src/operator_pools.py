@@ -214,6 +214,79 @@ class custom(OperatorPool):
         print(" Number of operators: ", self.n_ops)
         return
 
+class com_gen(OperatorPool):
+    def generate_SQ_Operators(self):
+
+        self.bin_pool = []
+        self.fermi_ops = []
+
+        ii = 3
+
+        self.n_spin_orb = ii
+
+        for i in range(2 ** (2 * ii)):
+            b_string = [int(j) for j in bin(i)[2:].zfill(2 * ii)]
+            self.bin_pool.append(b_string)
+
+        self.odd_string = []
+
+        for i in self.bin_pool:
+            if sum(i[k] * i[k + ii] for k in range(ii)) % 2 == 1:
+                self.odd_string.append(i)
+
+        print("total number of antisymmetric ops :"+str(len(self.odd_string)))
+
+        random.shuffle(self.odd_string)
+        first_picked = self.odd_string[:(2 * ii - 2)]
+        picked = first_picked
+        print("initial picked pool size:", len(picked))
+
+        pool_vec = np.zeros((4 ** ii,))
+
+        for i in picked:
+            index = int("".join(str(x) for x in i), 2)
+            pool_vec[index] = 1
+
+        length = 0
+
+        while len(picked) < 4 ** ii:
+            new = []
+            if length == 0:
+                end = len(picked)
+            else:
+                end = length
+
+            for i in range(end):
+                for j in range(i+1, len(picked)):
+                    Bin = [(picked[i][k] + picked[j][k]) % 2 for k in range(2 * ii)]
+                    index = int("".join(str(x) for x in Bin), 2)
+                    if pool_vec[index] == 0:
+                        new.append(Bin)
+                        pool_vec[index] = 1
+            length = len(new)
+            for i in new:
+                picked.insert(0, i)
+            if length == 0:
+                break
+
+        print('size of set %12i' % (len(picked)))
+
+        for i in range(len(picked)):
+            pauli_string = ''
+            for j in range(ii):
+                if picked[i][j] == 0:
+                    if picked[i][j + ii] == 1:
+                        pauli_string += 'X%d ' % j
+                if picked[i][j] == 1:
+                    if picked[i][j + ii] == 0:
+                        pauli_string += 'Z%d ' % j
+                    else:
+                        pauli_string += 'Y%d ' % j
+            A = QubitOperator(pauli_string, 0+1j)
+            self.fermi_ops.append(A)
+
+        self.n_ops = len(self.fermi_ops)
+
 class GSD_extract(OperatorPool):
     def generate_SQ_Operators(self):
         """

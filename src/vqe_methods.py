@@ -346,7 +346,7 @@ def random_Ham(geometry,
 
     for i in range(pool.n_ops):
         for j in range(pool.n_ops):
-            over_mat[i, j] = vec.transpose().conjugate().dot(pool.spmat_ops[i].dot(pool.spmat_ops[j].dot(vec)))[0,0]
+            over_mat[i, j] = vec.transpose().conjugate().dot(pool.spmat_ops[i].dot(pool.spmat_ops[j].dot(vec)))[0, 0]
 
     rank = np.linalg.matrix_rank(over_mat)
 
