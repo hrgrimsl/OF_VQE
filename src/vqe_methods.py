@@ -335,7 +335,7 @@ def random_Ham(geometry,
 
     over_mat = np.zeros(shape=(pool.n_ops, pool.n_ops))
     vec = np.random.rand(2 ** 3, 1)
-    print(vec)
+    # print(vec)
     norm = 0
 
     for i in vec:
@@ -370,7 +370,7 @@ def random_Ham(geometry,
     
     # reference_ket = 1/np.sqrt(2)*(np.exp(1j*0.5)*-1j*pool.spmat_ops[3].dot(reference_ket) + reference_ket)
 
-    print(reference_ket)
+    # print(reference_ket)
 
     reference_bra = reference_ket.transpose().conj()
 
