@@ -62,9 +62,9 @@ def adapt_vqe(geometry,
     # print("H",hamiltonian)
   #  print(hamiltonian[:,240])
     HJW = openfermion.transforms.jordan_wigner(hamiltonian_op)
-    pickle.dump(HJW, open('./h4_hamiltonian.p','wb'))
+    # pickle.dump(HJW, open('./h4_hamiltonian.p','wb'))
 
-    print(HJW)
+    # print(HJW)
 
     #Thetas
     parameters = []
@@ -76,7 +76,7 @@ def adapt_vqe(geometry,
 
     over_mat = np.zeros(shape=(pool.n_ops, pool.n_ops))
     vec = np.random.rand(2 ** pool.n_spin_orb, 1)
-    print(vec)
+    # print(vec)
     norm = 0
 
     for i in vec:
@@ -560,8 +560,8 @@ def q_adapt_vqe(geometry,
         multiplicity    = 1,
         charge          = 0,
         adapt_conver    = 'norm',
-        adapt_thresh    = 1e-4,
-        theta_thresh    = 1e-9,
+        adapt_thresh    = 1e-6,
+        theta_thresh    = 1e-11,
         adapt_maxiter   = 400,
         pool            = operator_pools.qubits(),
         spin_adapt      = True,
@@ -2151,9 +2151,9 @@ def q_adapt_vqe_rand(geometry,
         multiplicity    = 1,
         charge          = 0,
         adapt_conver    = 'norm',
-        adapt_thresh    = 1e-7,
-        theta_thresh    = 1e-12,
-        adapt_maxiter   = 400,
+        adapt_thresh    = 1e-6,
+        theta_thresh    = 1e-11,
+        adapt_maxiter   = 1000,
         pool            = operator_pools.qubits(),
         spin_adapt      = True,
         psi4_filename   = "psi4_%12.12f"%random.random()

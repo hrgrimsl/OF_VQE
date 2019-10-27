@@ -2,6 +2,7 @@ import openfermion
 import numpy as np
 import copy as cp
 import re
+import scipy
 
 import random
 
@@ -370,17 +371,637 @@ class GSD_extract(OperatorPool):
                         pauli_string += 'X%d ' % k
                         flip.append(k)
                 if b_string[k] == 1:
-                    if b_string[k + n] == 0:
-                        pauli_string += 'Z%d ' % k
-                    else:
+                    if b_string[k + n] == 1:
                         pauli_string += 'Y%d ' % k
                         flip.append(k)
             flip.sort()
             z_string = list(range(flip[0] + 1,flip[1]))
             if len(flip) == 4:
-            	for i in range(flip[2] + 1, flip[3]):
-            		z_string.append(i)
+                for i in range(flip[2] + 1, flip[3]):
+                    z_string.append(i)
             print("Z string:", z_string)
+            for i in z_string:
+                b_string[i] += 1
+                b_string[i] = b_string[i] % 2
+            for k in range(n):
+                if b_string[k] == 1:
+                    if b_string[k + n] == 0:
+                        pauli_string += 'Z%d ' % k
+            A = QubitOperator(pauli_string, 0 + 1j)
+            print("Pauli:", pauli_string)
+            self.fermi_ops.append(A)
+
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of pauli operators: ", self.n_ops)
+
+        return
+
+class GSD_extract_hh(OperatorPool):
+    def generate_SQ_Operators(self):
+        """
+        n_orb is number of spatial orbitals assuming that spin orbitals are labelled
+        0a,0b,1a,1b,2a,2b,3a,3b,....  -> 0,1,2,3,...
+        """
+
+        print(" Form singlet GSD operators")
+
+        self.fermi_ops = []
+        for p in range(0, self.n_orb):
+            pa = 2 * p
+            pb = 2 * p + 1
+
+            for q in range(p, self.n_orb):
+                qa = 2 * q
+                qb = 2 * q + 1
+
+                termA = FermionOperator(((pa, 1), (qa, 0)))
+                termA += FermionOperator(((pb, 1), (qb, 0)))
+
+                termA -= hermitian_conjugated(termA)
+
+                termA = normal_ordered(termA)
+
+                # Normalize
+                coeffA = 0
+                for t in termA.terms:
+                    coeff_t = termA.terms[t]
+                    coeffA += coeff_t * coeff_t
+
+                if termA.many_body_order() > 0:
+                    termA = termA / np.sqrt(coeffA)
+                    self.fermi_ops.append(termA)
+
+        pq = -1
+        for p in range(0, self.n_orb):
+            pa = 2 * p
+            pb = 2 * p + 1
+
+            for q in range(p, self.n_orb):
+                qa = 2 * q
+                qb = 2 * q + 1
+
+                pq += 1
+
+                rs = -1
+                for r in range(0, self.n_orb):
+                    ra = 2 * r
+                    rb = 2 * r + 1
+
+                    for s in range(r, self.n_orb):
+                        sa = 2 * s
+                        sb = 2 * s + 1
+
+                        rs += 1
+
+                        if (pq > rs):
+                            continue
+
+                        termA = FermionOperator(((ra, 1), (pa, 0), (sa, 1), (qa, 0)), 2 / np.sqrt(12))
+                        termA += FermionOperator(((rb, 1), (pb, 0), (sb, 1), (qb, 0)), 2 / np.sqrt(12))
+                        termA += FermionOperator(((ra, 1), (pa, 0), (sb, 1), (qb, 0)), 1 / np.sqrt(12))
+                        termA += FermionOperator(((rb, 1), (pb, 0), (sa, 1), (qa, 0)), 1 / np.sqrt(12))
+                        termA += FermionOperator(((ra, 1), (pb, 0), (sb, 1), (qa, 0)), 1 / np.sqrt(12))
+                        termA += FermionOperator(((rb, 1), (pa, 0), (sa, 1), (qb, 0)), 1 / np.sqrt(12))
+
+                        termB = FermionOperator(((ra, 1), (pa, 0), (sb, 1), (qb, 0)), 1 / 2.0)
+                        termB += FermionOperator(((rb, 1), (pb, 0), (sa, 1), (qa, 0)), 1 / 2.0)
+                        termB += FermionOperator(((ra, 1), (pb, 0), (sb, 1), (qa, 0)), -1 / 2.0)
+                        termB += FermionOperator(((rb, 1), (pa, 0), (sa, 1), (qb, 0)), -1 / 2.0)
+
+                        termA -= hermitian_conjugated(termA)
+                        termB -= hermitian_conjugated(termB)
+
+                        termA = normal_ordered(termA)
+                        termB = normal_ordered(termB)
+
+                        # Normalize
+                        coeffA = 0
+
+                        for t in termA.terms:
+                            coeff_t = termA.terms[t]
+                            coeffA += coeff_t * coeff_t
+
+                        coeffB = 0
+
+                        for t in termB.terms:
+                            coeff_t = termB.terms[t]
+                            coeffB += coeff_t * coeff_t
+
+                        if termA.many_body_order() > 0:
+                            termA = termA / np.sqrt(coeffA)
+                            self.fermi_ops.append(termA)
+
+                        if termB.many_body_order() > 0:
+                            termB = termB / np.sqrt(coeffB)
+                            self.fermi_ops.append(termB)
+
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of fermionic operators: ", self.n_ops)
+
+        n = self.n_spin_orb
+
+        pool_vec = np.zeros((4 ** n,))
+
+        for i in self.fermi_ops:
+            pauli = openfermion.transforms.jordan_wigner(i)
+            for line in pauli.terms:
+                line = str(line)
+                # print(line)
+                Bin = np.zeros((2 * n,), dtype=int)
+                X_pat_1 = re.compile("(\d{,2}), 'X'")
+                X_1 = X_pat_1.findall(line)
+                if X_1:
+                    for i in X_1:
+                        k = int(i)
+                        Bin[n + k] = 1
+                Y_pat_1 = re.compile("(\d{,2}), 'Y'")
+                Y_1 = Y_pat_1.findall(line)
+                if Y_1:
+                    for i in Y_1:
+                        k = int(i)
+                        Bin[n + k] = 1
+                        Bin[k] = 1
+                Z_pat_1 = re.compile("(\d{,2}), 'Z'")
+                Z_1 = Z_pat_1.findall(line)
+                if Z_1:
+                    for i in Z_1:
+                        k = int(i)
+                        Bin[k] = 1
+                # print(Bin)
+                index = int("".join(str(x) for x in Bin), 2)
+                # print("index", index)
+
+                pool_vec[index] = int(1)
+
+        nz = np.nonzero(pool_vec)[0]
+
+        print("pauli pool size:", len(pool_vec[nz]))
+
+        self.fermi_ops = []
+
+        m = 2*n
+
+        for i in nz:
+            p = int(i)
+            bi = bin(p)
+            b_string = [int(j) for j in bi[2:].zfill(m)]
+            pauli_string = ''
+            flip = []
+            for k in range(n):
+                if b_string[k] == 0:
+                    if b_string[k + n] == 1:
+                        pauli_string += 'X%d ' % k
+                        flip.append(k)
+                if b_string[k] == 1:
+                    if b_string[k + n] == 1:
+                        pauli_string += 'Y%d ' % k
+                        flip.append(k)
+            flip.sort()
+            z_string = list(range(flip[0] + 1,flip[1]))
+            if len(flip) == 4:
+                for i in range(flip[2] + 1, flip[3]):
+                    z_string.append(i)
+            print("Z string:", z_string)
+            for i in z_string:
+                b_string[i] += 1
+                b_string[i] = b_string[i] % 2
+            for k in range(n):
+                if b_string[k] == 1:
+                    if b_string[k + n] == 0:
+                        pauli_string += 'Z%d ' % k
+            A = QubitOperator(pauli_string, 0 + 1j)
+            print("Pauli:", pauli_string)
+            self.fermi_ops.append(A)
+
+        print("original size", len(self.fermi_ops))
+
+        self.fermi_ops_1 = self.fermi_ops
+        self.fermi_ops = []
+
+        np.random.shuffle(self.fermi_ops_1)
+        for op in self.fermi_ops_1[:len(self.fermi_ops_1)//4]:
+            self.fermi_ops.append(op)
+
+        for op in self.fermi_ops:
+            print(op)
+
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of operators: ", self.n_ops)
+        return
+
+class GSD_extract_hhhh(OperatorPool):
+    def generate_SQ_Operators(self):
+        """
+        n_orb is number of spatial orbitals assuming that spin orbitals are labelled
+        0a,0b,1a,1b,2a,2b,3a,3b,....  -> 0,1,2,3,...
+        """
+
+        print(" Form singlet GSD operators")
+
+        self.fermi_ops = []
+        for p in range(0, self.n_orb):
+            pa = 2 * p
+            pb = 2 * p + 1
+
+            for q in range(p, self.n_orb):
+                qa = 2 * q
+                qb = 2 * q + 1
+
+                termA = FermionOperator(((pa, 1), (qa, 0)))
+                termA += FermionOperator(((pb, 1), (qb, 0)))
+
+                termA -= hermitian_conjugated(termA)
+
+                termA = normal_ordered(termA)
+
+                # Normalize
+                coeffA = 0
+                for t in termA.terms:
+                    coeff_t = termA.terms[t]
+                    coeffA += coeff_t * coeff_t
+
+                if termA.many_body_order() > 0:
+                    termA = termA / np.sqrt(coeffA)
+                    self.fermi_ops.append(termA)
+
+        pq = -1
+        for p in range(0, self.n_orb):
+            pa = 2 * p
+            pb = 2 * p + 1
+
+            for q in range(p, self.n_orb):
+                qa = 2 * q
+                qb = 2 * q + 1
+
+                pq += 1
+
+                rs = -1
+                for r in range(0, self.n_orb):
+                    ra = 2 * r
+                    rb = 2 * r + 1
+
+                    for s in range(r, self.n_orb):
+                        sa = 2 * s
+                        sb = 2 * s + 1
+
+                        rs += 1
+
+                        if (pq > rs):
+                            continue
+
+                        termA = FermionOperator(((ra, 1), (pa, 0), (sa, 1), (qa, 0)), 2 / np.sqrt(12))
+                        termA += FermionOperator(((rb, 1), (pb, 0), (sb, 1), (qb, 0)), 2 / np.sqrt(12))
+                        termA += FermionOperator(((ra, 1), (pa, 0), (sb, 1), (qb, 0)), 1 / np.sqrt(12))
+                        termA += FermionOperator(((rb, 1), (pb, 0), (sa, 1), (qa, 0)), 1 / np.sqrt(12))
+                        termA += FermionOperator(((ra, 1), (pb, 0), (sb, 1), (qa, 0)), 1 / np.sqrt(12))
+                        termA += FermionOperator(((rb, 1), (pa, 0), (sa, 1), (qb, 0)), 1 / np.sqrt(12))
+
+                        termB = FermionOperator(((ra, 1), (pa, 0), (sb, 1), (qb, 0)), 1 / 2.0)
+                        termB += FermionOperator(((rb, 1), (pb, 0), (sa, 1), (qa, 0)), 1 / 2.0)
+                        termB += FermionOperator(((ra, 1), (pb, 0), (sb, 1), (qa, 0)), -1 / 2.0)
+                        termB += FermionOperator(((rb, 1), (pa, 0), (sa, 1), (qb, 0)), -1 / 2.0)
+
+                        termA -= hermitian_conjugated(termA)
+                        termB -= hermitian_conjugated(termB)
+
+                        termA = normal_ordered(termA)
+                        termB = normal_ordered(termB)
+
+                        # Normalize
+                        coeffA = 0
+
+                        for t in termA.terms:
+                            coeff_t = termA.terms[t]
+                            coeffA += coeff_t * coeff_t
+
+                        coeffB = 0
+
+                        for t in termB.terms:
+                            coeff_t = termB.terms[t]
+                            coeffB += coeff_t * coeff_t
+
+                        if termA.many_body_order() > 0:
+                            termA = termA / np.sqrt(coeffA)
+                            self.fermi_ops.append(termA)
+
+                        if termB.many_body_order() > 0:
+                            termB = termB / np.sqrt(coeffB)
+                            self.fermi_ops.append(termB)
+
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of fermionic operators: ", self.n_ops)
+
+        n = self.n_spin_orb
+
+        pool_vec = np.zeros((4 ** n,))
+
+        for i in self.fermi_ops:
+            pauli = openfermion.transforms.jordan_wigner(i)
+            for line in pauli.terms:
+                line = str(line)
+                # print(line)
+                Bin = np.zeros((2 * n,), dtype=int)
+                X_pat_1 = re.compile("(\d{,2}), 'X'")
+                X_1 = X_pat_1.findall(line)
+                if X_1:
+                    for i in X_1:
+                        k = int(i)
+                        Bin[n + k] = 1
+                Y_pat_1 = re.compile("(\d{,2}), 'Y'")
+                Y_1 = Y_pat_1.findall(line)
+                if Y_1:
+                    for i in Y_1:
+                        k = int(i)
+                        Bin[n + k] = 1
+                        Bin[k] = 1
+                Z_pat_1 = re.compile("(\d{,2}), 'Z'")
+                Z_1 = Z_pat_1.findall(line)
+                if Z_1:
+                    for i in Z_1:
+                        k = int(i)
+                        Bin[k] = 1
+                # print(Bin)
+                index = int("".join(str(x) for x in Bin), 2)
+                # print("index", index)
+
+                pool_vec[index] = int(1)
+
+        nz = np.nonzero(pool_vec)[0]
+
+        print("pauli pool size:", len(pool_vec[nz]))
+
+        self.fermi_ops = []
+
+        m = 2*n
+
+        for i in nz:
+            p = int(i)
+            bi = bin(p)
+            b_string = [int(j) for j in bi[2:].zfill(m)]
+            pauli_string = ''
+            flip = []
+            for k in range(n):
+                if b_string[k] == 0:
+                    if b_string[k + n] == 1:
+                        pauli_string += 'X%d ' % k
+                        flip.append(k)
+                if b_string[k] == 1:
+                    if b_string[k + n] == 1:
+                        pauli_string += 'Y%d ' % k
+                        flip.append(k)
+            flip.sort()
+            z_string = list(range(flip[0] + 1,flip[1]))
+            if len(flip) == 4:
+                for i in range(flip[2] + 1, flip[3]):
+                    z_string.append(i)
+            print("Z string:", z_string)
+            for i in z_string:
+                b_string[i] += 1
+                b_string[i] = b_string[i] % 2
+            for k in range(n):
+                if b_string[k] == 1:
+                    if b_string[k + n] == 0:
+                        pauli_string += 'Z%d ' % k
+            A = QubitOperator(pauli_string, 0 + 1j)
+            print("Pauli:", pauli_string)
+            self.fermi_ops.append(A)
+
+        print("original size", len(self.fermi_ops))
+
+        self.fermi_ops_1 = self.fermi_ops
+        self.fermi_ops = []
+
+        np.random.shuffle(self.fermi_ops_1)
+        for op in self.fermi_ops_1[:len(self.fermi_ops_1) // 16]:
+            self.fermi_ops.append(op)
+
+        for op in self.fermi_ops:
+            print(op)
+
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of operators: ", self.n_ops)
+        return
+
+class GSD_extract_reduce(OperatorPool):
+    def generate_SQ_Operators(self):
+        """
+        n_orb is number of spatial orbitals assuming that spin orbitals are labelled
+        0a,0b,1a,1b,2a,2b,3a,3b,....  -> 0,1,2,3,...
+        """
+
+        print(" Form singlet GSD operators")
+
+        self.fermi_ops = []
+        for p in range(0, self.n_orb):
+            pa = 2 * p
+            pb = 2 * p + 1
+
+            for q in range(p, self.n_orb):
+                qa = 2 * q
+                qb = 2 * q + 1
+
+                termA = FermionOperator(((pa, 1), (qa, 0)))
+                termA += FermionOperator(((pb, 1), (qb, 0)))
+
+                termA -= hermitian_conjugated(termA)
+
+                termA = normal_ordered(termA)
+
+                # Normalize
+                coeffA = 0
+                for t in termA.terms:
+                    coeff_t = termA.terms[t]
+                    coeffA += coeff_t * coeff_t
+
+                if termA.many_body_order() > 0:
+                    termA = termA / np.sqrt(coeffA)
+                    self.fermi_ops.append(termA)
+
+        pq = -1
+        for p in range(0, self.n_orb):
+            pa = 2 * p
+            pb = 2 * p + 1
+
+            for q in range(p, self.n_orb):
+                qa = 2 * q
+                qb = 2 * q + 1
+
+                pq += 1
+
+                rs = -1
+                for r in range(0, self.n_orb):
+                    ra = 2 * r
+                    rb = 2 * r + 1
+
+                    for s in range(r, self.n_orb):
+                        sa = 2 * s
+                        sb = 2 * s + 1
+
+                        rs += 1
+
+                        if (pq > rs):
+                            continue
+
+                        termA = FermionOperator(((ra, 1), (pa, 0), (sa, 1), (qa, 0)), 2 / np.sqrt(12))
+                        termA += FermionOperator(((rb, 1), (pb, 0), (sb, 1), (qb, 0)), 2 / np.sqrt(12))
+                        termA += FermionOperator(((ra, 1), (pa, 0), (sb, 1), (qb, 0)), 1 / np.sqrt(12))
+                        termA += FermionOperator(((rb, 1), (pb, 0), (sa, 1), (qa, 0)), 1 / np.sqrt(12))
+                        termA += FermionOperator(((ra, 1), (pb, 0), (sb, 1), (qa, 0)), 1 / np.sqrt(12))
+                        termA += FermionOperator(((rb, 1), (pa, 0), (sa, 1), (qb, 0)), 1 / np.sqrt(12))
+
+                        termB = FermionOperator(((ra, 1), (pa, 0), (sb, 1), (qb, 0)), 1 / 2.0)
+                        termB += FermionOperator(((rb, 1), (pb, 0), (sa, 1), (qa, 0)), 1 / 2.0)
+                        termB += FermionOperator(((ra, 1), (pb, 0), (sb, 1), (qa, 0)), -1 / 2.0)
+                        termB += FermionOperator(((rb, 1), (pa, 0), (sa, 1), (qb, 0)), -1 / 2.0)
+
+                        termA -= hermitian_conjugated(termA)
+                        termB -= hermitian_conjugated(termB)
+
+                        termA = normal_ordered(termA)
+                        termB = normal_ordered(termB)
+
+                        # Normalize
+                        coeffA = 0
+
+                        for t in termA.terms:
+                            coeff_t = termA.terms[t]
+                            coeffA += coeff_t * coeff_t
+
+                        coeffB = 0
+
+                        for t in termB.terms:
+                            coeff_t = termB.terms[t]
+                            coeffB += coeff_t * coeff_t
+
+                        if termA.many_body_order() > 0:
+                            termA = termA / np.sqrt(coeffA)
+                            self.fermi_ops.append(termA)
+
+                        if termB.many_body_order() > 0:
+                            termB = termB / np.sqrt(coeffB)
+                            self.fermi_ops.append(termB)
+
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of fermionic operators: ", self.n_ops)
+
+        n = self.n_spin_orb
+
+        over_mat = np.zeros(shape=(self.n_ops, self.n_ops))
+        vec = np.random.rand(2 ** self.n_spin_orb, 1)
+        # print(vec)
+        norm = 0
+
+        for i in vec:
+            norm += i * i
+
+        vec = np.true_divide(vec, np.sqrt(norm))
+        vec = scipy.sparse.csc_matrix(vec)
+
+        self.spmat_ops = []
+        print(" Generate Sparse Matrices for operators in pool")
+        for op in self.fermi_ops:
+            self.spmat_ops.append(transforms.get_sparse_operator(op, n_qubits=self.n_spin_orb))
+
+        for i in range(self.n_ops):
+            for j in range(self.n_ops):
+                over_mat[i, j] = vec.transpose().conjugate().dot(self.spmat_ops[i].dot(self.spmat_ops[j].dot(vec)))[0, 0]
+
+        rank = np.linalg.matrix_rank(over_mat)
+
+        print("original rank =", rank)
+
+        combined = list(zip(self.spmat_ops, self.fermi_ops))
+
+        for i in range(100):
+            random.shuffle(combined)
+            self.spmat_ops[:], self.fermi_ops[:] = zip(*combined)
+            self.spmat_trial = self.spmat_ops[0:20]
+            over_mat = np.zeros(shape=(len(self.spmat_trial), len(self.spmat_trial)))
+            vec = np.random.rand(2 ** self.n_spin_orb, 1)
+            # print(vec)
+            norm = 0
+            for i in vec:
+                norm += i * i
+            vec = np.true_divide(vec, np.sqrt(norm))
+            vec = scipy.sparse.csc_matrix(vec)
+            for i in range(len(self.spmat_trial)):
+                for j in range(len(self.spmat_trial)):
+                    over_mat[i, j] = vec.transpose().conjugate().dot(self.spmat_trial[i].dot(self.spmat_trial[j].dot(vec)))[0, 0]
+            rank = np.linalg.matrix_rank(over_mat)
+            if rank == 20:
+                self.spmat_ops = self.spmat_ops[0:20]
+                self.fermi_ops = self.fermi_ops[0:20]
+                break
+
+        pool_vec = np.zeros((4 ** n,))
+
+        for i in self.fermi_ops:
+            pauli = openfermion.transforms.jordan_wigner(i)
+            for line in pauli.terms:
+                line = str(line)
+                # print(line)
+                Bin = np.zeros((2 * n,), dtype=int)
+                X_pat_1 = re.compile("(\d{,2}), 'X'")
+                X_1 = X_pat_1.findall(line)
+                if X_1:
+                    for i in X_1:
+                        k = int(i)
+                        Bin[n + k] = 1
+                Y_pat_1 = re.compile("(\d{,2}), 'Y'")
+                Y_1 = Y_pat_1.findall(line)
+                if Y_1:
+                    for i in Y_1:
+                        k = int(i)
+                        Bin[n + k] = 1
+                        Bin[k] = 1
+                Z_pat_1 = re.compile("(\d{,2}), 'Z'")
+                Z_1 = Z_pat_1.findall(line)
+                if Z_1:
+                    for i in Z_1:
+                        k = int(i)
+                        Bin[k] = 1
+                # print(Bin)
+                index = int("".join(str(x) for x in Bin), 2)
+                # print("index", index)
+
+                pool_vec[index] = int(1)
+
+        nz = np.nonzero(pool_vec)[0]
+
+        # print("pauli pool size:", len(pool_vec[nz]))
+
+        self.fermi_ops = []
+
+        m = 2*n
+
+        for i in nz:
+            p = int(i)
+            bi = bin(p)
+            b_string = [int(j) for j in bi[2:].zfill(m)]
+            pauli_string = ''
+            flip = []
+            for k in range(n):
+                if b_string[k] == 0:
+                    if b_string[k + n] == 1:
+                        pauli_string += 'X%d ' % k
+                        flip.append(k)
+                if b_string[k] == 1:
+                    if b_string[k + n] == 1:
+                        pauli_string += 'Y%d ' % k
+                        flip.append(k)
+            flip.sort()
+            z_string = list(range(flip[0] + 1,flip[1]))
+            if len(flip) == 4:
+                for i in range(flip[2] + 1, flip[3]):
+                    z_string.append(i)
+            print("Z string:", z_string)
+            for i in z_string:
+                b_string[i] += 1
+                b_string[i] = b_string[i] % 2
+            for k in range(n):
+                if b_string[k] == 1:
+                    if b_string[k + n] == 0:
+                        pauli_string += 'Z%d ' % k
             A = QubitOperator(pauli_string, 0 + 1j)
             print("Pauli:", pauli_string)
             self.fermi_ops.append(A)
@@ -572,7 +1193,152 @@ class singlet_SD(OperatorPool):
         
         self.n_ops = len(self.fermi_ops)
         print(" Number of operators: ", self.n_ops)
-        return 
+        return
+
+
+class qubits(OperatorPool):
+    def generate_SQ_Operators(self):
+
+        self.fermi_ops = []
+
+        n_occ = self.n_occ
+        n_vir = self.n_vir
+
+        for p in range(0, 2 * self.n_orb):
+            X = QubitOperator('X%d' % p, 0 + 1j)
+            Y = QubitOperator('Y%d' % p, 0 + 1j)
+
+            # self.fermi_ops.append(Y)
+            # self.fermi_ops.append(X)
+        for p in range(0, 2 * self.n_orb):
+            Z = QubitOperator('Z%d' % p, 0 + 1j)
+
+            # self.fermi_ops.append(Z)
+
+        for p in range(0, 2 * self.n_orb):
+
+            for q in range(p + 1, 2 * self.n_orb):
+                ZZ = QubitOperator('Z%d Z%d' % (p, q), 0 + 1j)
+                # self.fermi_ops.append(ZZ)
+
+        for p in range(0, 2 * self.n_orb):
+            for q in range(p + 1, 2 * self.n_orb):
+                XX = QubitOperator('X%d X%d' % (p, q), 0 + 1j)
+                XY = QubitOperator('X%d Y%d' % (p, q), 0 + 1j)
+                YX = QubitOperator('Y%d X%d' % (p, q), 0 + 1j)
+                XZ = QubitOperator('X%d Z%d' % (p, q), 0 + 1j)
+                YZ = QubitOperator('Y%d Z%d' % (p, q), 0 + 1j)
+                YY = QubitOperator('Y%d Y%d' % (p, q), 0 + 1j)
+
+                # self.fermi_ops.append(XX)
+                self.fermi_ops.append(YX)
+                # self.fermi_ops.append(XZ)
+                # self.fermi_ops.append(YZ)
+                # self.fermi_ops.append(YY)
+                # self.fermi_ops.append(XY)
+
+        for i in range(0, 2 * self.n_orb):
+            for j in range(i + 1, 2 * self.n_orb):
+
+                for k in range(j + 1, 2 * self.n_orb):
+                    YXZ = QubitOperator('Y%d X%d Z%d' % (i, j, k), 1j)
+                    XYZ = QubitOperator('X%d Y%d Z%d' % (i, j, k), 1j)
+                    XZY = QubitOperator('X%d Z%d Y%d' % (i, j, k), 1j)
+                    YZX = QubitOperator('Y%d Z%d X%d' % (i, j, k), 1j)
+                    ZXY = QubitOperator('Z%d X%d Y%d' % (i, j, k), 1j)
+                    ZYX = QubitOperator('Z%d X%d Y%d' % (i, j, k), 1j)
+                    # ZZZ = QubitOperator('Z%d Z%d Z%d'% (i, j, k), 1j)
+
+                    self.fermi_ops.append(XYZ)
+                    # self.fermi_ops.append(YXZ)
+                    self.fermi_ops.append(XZY)
+                    # self.fermi_ops.append(YZX)
+                    self.fermi_ops.append(ZXY)
+                    # self.fermi_ops.append(ZYX)
+                    # self.fermi_ops.append(ZZZ)
+
+                    # XXY = QubitOperator('X%d X%d Y%d'% (i, j, k), 1j)
+                    # XYY = QubitOperator('X%d Y%d Y%d'% (i, j, k), 1j)
+
+                    # self.fermi_ops.append(XXY)
+                    # self.fermi_ops.append(XYY)
+
+        for p in range(0, 2 * self.n_orb):
+            for q in range(p + 1, 2 * self.n_orb):
+                for r in range(q + 1, 2 * self.n_orb):
+                    for s in range(r + 1, 2 * self.n_orb):
+                        XYYY = QubitOperator('X%d Y%d Y%d Y%d' % (p, q, r, s), 1j)
+                        YXYY = QubitOperator('Y%d X%d Y%d Y%d' % (p, q, r, s), 1j)
+                        YYXY = QubitOperator('Y%d Y%d X%d Y%d' % (p, q, r, s), 1j)
+                        YYYX = QubitOperator('Y%d Y%d Y%d X%d' % (p, q, r, s), 1j)
+
+                        self.fermi_ops.append(XYYY)
+                        self.fermi_ops.append(YXYY)
+                        self.fermi_ops.append(YYXY)
+                        self.fermi_ops.append(YYYX)
+
+                        XXXY = QubitOperator('X%d X%d X%d Y%d'% (p, q, r, s), 1j)
+                        YXXX = QubitOperator('Y%d X%d X%d X%d'% (p, q, r, s), 1j)
+                        XYXX = QubitOperator('X%d Y%d X%d X%d'% (p, q, r, s), 1j)
+                        XXYX = QubitOperator('X%d X%d Y%d X%d'% (p, q, r, s), 1j)
+
+                        self.fermi_ops.append(XXXY)
+                        self.fermi_ops.append(XXYX)
+                        self.fermi_ops.append(XYXX)
+                        self.fermi_ops.append(YXXX)
+
+                        # ZZXY = QubitOperator('Z%d Z%d X%d Y%d'% (p, q, r, s), 1j)
+                        # ZZYX = QubitOperator('Z%d Z%d Y%d X%d'% (p, q, r, s), 1j)
+                        # XZZY = QubitOperator('X%d Z%d Z%d Y%d'% (p, q, r, s), 1j)
+                        # YZZX = QubitOperator('Y%d Z%d Z%d X%d'% (p, q, r, s), 1j)
+                        # ZYXZ = QubitOperator('Z%d Y%d X%d Z%d'% (p, q, r, s), 1j)
+                        # ZXYZ = QubitOperator('Z%d X%d Y%d Z%d'% (p, q, r, s), 1j)
+                        # XYZZ = QubitOperator('X%d Y%d Z%d Z%d'% (p, q, r, s), 1j)
+                        # YXZZ = QubitOperator('Y%d X%d Z%d Z%d'% (p, q, r, s), 1j)
+                        # XZYZ = QubitOperator('X%d Z%d Y%d Z%d'% (p, q, r, s), 1j)
+                        # YZXZ = QubitOperator('Y%d Z%d X%d Z%d'% (p, q, r, s), 1j)
+                        # ZXZY = QubitOperator('Z%d X%d Z%d Y%d'% (p, q, r, s), 1j)
+                        # ZYZX = QubitOperator('Z%d Y%d Z%d X%d'% (p, q, r, s), 1j)
+
+                        # self.fermi_ops.append(ZZXY)
+                        # self.fermi_ops.append(ZZYX)
+                        # self.fermi_ops.append(XZZY)
+                        # self.fermi_ops.append(YZZX)
+                        # self.fermi_ops.append(ZXYZ)
+                        # self.fermi_ops.append(ZYXZ)
+                        # self.fermi_ops.append(XYZZ)
+                        # self.fermi_ops.append(YXZZ)
+                        # self.fermi_ops.append(XZYZ)
+                        # self.fermi_ops.append(YZXZ)
+                        # self.fermi_ops.append(ZXZY)
+                        # self.fermi_ops.append(ZYZX)
+
+                        # XXYY = QubitOperator('X%d X%d Y%d Y%d'% (p, q, r, s), 1j)
+                        # XYXY = QubitOperator('X%d Y%d X%d Y%d'% (p, q, r, s), 1j)
+                        # XYYX = QubitOperator('X%d Y%d Y%d X%d'% (p, q, r, s), 1j)
+                        # YYXX = QubitOperator('Y%d Y%d X%d X%d'% (p, q, r, s), 1j)
+                        # YXXY = QubitOperator('Y%d X%d X%d Y%d'% (p, q, r, s), 1j)
+                        # YXYX = QubitOperator('Y%d X%d Y%d X%d'% (p, q, r, s), 1j)
+
+                        # self.fermi_ops.append(XXYY)
+                        # self.fermi_ops.append(XYXY)
+                        # self.fermi_ops.append(XYYX)
+                        # self.fermi_ops.append(YYXX)
+                        # self.fermi_ops.append(YXXY)
+                        # self.fermi_ops.append(YXYX)
+
+                        # XXXX = QubitOperator('X%d X%d X%d X%d'% (p, q, r, s), 1j)
+                        # YYYY = QubitOperator('Y%d Y%d Y%d Y%d'% (p, q, r, s), 1j)
+
+                        # self.fermi_ops.append(XXXX)
+                        # self.fermi_ops.append(YYYY)
+
+        for op in self.fermi_ops:
+            print(op)
+
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of operators: ", self.n_ops)
+        return
 
 class qubits(OperatorPool):
     def generate_SQ_Operators(self):
