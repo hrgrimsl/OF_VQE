@@ -161,6 +161,58 @@ class singlet_GSD(OperatorPool):
         print(" Number of operators: ", self.n_ops)
         return
 
+class custom(OperatorPool):
+    def generate_SQ_Operators(self):
+        """
+        n_orb is number of spatial orbitals assuming that spin orbitals are labelled
+        0a,0b,1a,1b,2a,2b,3a,3b,....  -> 0,1,2,3,...
+        """
+        
+        print(" Form singlet GSD operators")
+
+        self.n_spin_orb = 3
+        
+        self.fermi_ops = []
+
+        # termA = QubitOperator('X0 X1 Y2', 1j)
+        # self.fermi_ops.append(termA)
+        # termA = QubitOperator('X0 Y1', 1j)
+        # self.fermi_ops.append(termA)
+        # termA = QubitOperator('X0 Z1 Y2', 1j)
+        # self.fermi_ops.append(termA)
+        # termA = QubitOperator('Y0', 1j)
+        # self.fermi_ops.append(termA)
+
+        termA = QubitOperator('Y1 X2', 1j)
+        self.fermi_ops.append(termA)
+        termA = QubitOperator('Y1 Z2', 1j)
+        self.fermi_ops.append(termA)
+        termA = QubitOperator('X0 Y2', 1j)
+        self.fermi_ops.append(termA)
+        termA = QubitOperator('Y0 X1', 1j)
+        self.fermi_ops.append(termA)
+
+        # termA = QubitOperator('Z1 Y2', 1j)
+        # self.fermi_ops.append(termA)
+        # termA = QubitOperator('Y0 Z1', 1j)
+        # self.fermi_ops.append(termA)
+        # termA = QubitOperator('X0 Y1', 1j)
+        # self.fermi_ops.append(termA)
+        # termA = QubitOperator('Z0 Y1 Z2', 1j)
+        # self.fermi_ops.append(termA)
+
+        # termA = QubitOperator('Y0 Z1 Z2', 1j)
+        # self.fermi_ops.append(termA)
+        # termA = QubitOperator('Y0 Z1', 1j)
+        # self.fermi_ops.append(termA)
+        # termA = QubitOperator('X0 Y2', 1j)
+        # self.fermi_ops.append(termA)
+        # termA = QubitOperator('X0 Y1 Z2', 1j)
+        # self.fermi_ops.append(termA)
+
+        self.n_ops = len(self.fermi_ops)
+        print(" Number of operators: ", self.n_ops)
+        return
 
 class GSD_extract(OperatorPool):
     def generate_SQ_Operators(self):
