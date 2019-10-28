@@ -323,7 +323,7 @@ def random_Ham(geometry,
     w, v = scipy.sparse.linalg.eigs(hamiltonian, which='SR')
     GS = scipy.sparse.csc_matrix(v[:,w.argmin()]).transpose().conj()
     # print(GS)
-    print('Ground state energy:',min(w))
+    print('Ground state energy:', min(w).real)
     # GS_energy = GS.transpose().conj().dot(hamiltonian.dot(GS))
     # print('GS energy', GS_energy )
 

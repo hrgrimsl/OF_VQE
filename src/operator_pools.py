@@ -173,6 +173,7 @@ class custom(OperatorPool):
         self.n_spin_orb = 3
         
         self.fermi_ops = []
+        gen_pool =[]
 
         # termA = QubitOperator('X0 X1 Y2', 1j)
         # self.fermi_ops.append(termA)
@@ -192,6 +193,9 @@ class custom(OperatorPool):
         termA = QubitOperator('Y0 X1', 1j)
         self.fermi_ops.append(termA)
 
+        for i in self.fermi_ops:
+            gen_pool.append(i)
+
         # termA = QubitOperator('Z1 Y2', 1j)
         # self.fermi_ops.append(termA)
         # termA = QubitOperator('Y0 Z1', 1j)
@@ -209,6 +213,69 @@ class custom(OperatorPool):
         # self.fermi_ops.append(termA)
         # termA = QubitOperator('X0 Y1 Z2', 1j)
         # self.fermi_ops.append(termA)
+
+        print("initial picked pool size:", len(self.fermi_ops))
+
+        pool_vec = np.zeros((4 ** self.n_spin_orb,))
+
+        for i in picked:
+            index = int("".join(str(x) for x in i), 2)
+            pool_vec[index] = 1
+
+        length = 0
+
+        while len(picked) < 4 ** self.n_spin_orb:
+            new = []
+            if length == 0:
+                end = len(picked)
+            else:
+                end = length
+            for i in range(end):
+                for j in range(i + 1, len(picked)):
+                    Bin = [(picked[i][k] + picked[j][k]) % 2 for k in range(2 * self.n_spin_orb)]
+                    index = int("".join(str(x) for x in Bin), 2)
+                    if pool_vec[index] == 0:
+                        new.append(Bin)
+                        pool_vec[index] = 1
+            length = len(new)
+            for i in new:
+                picked.insert(0, i)
+            if length == 0:
+                break
+
+        print('size of set %12i' % (len(picked)))
+
+        self.generated_ops = []
+
+        for i in range(len(picked)):
+            pauli_string = ''
+            for j in range(self.n_spin_orb):
+                if picked[i][j] == 0:
+                    if picked[i][j + ii] == 1:
+                        pauli_string += 'X%d ' % j
+                if picked[i][j] == 1:
+                    if picked[i][j + ii] == 0:
+                        pauli_string += 'Z%d ' % j
+                    else:
+                        pauli_string += 'Y%d ' % j
+            A = QubitOperator(pauli_string, 0 + 1j)
+            self.generated_ops.append(A)
+
+        for i in range(len(first_picked)):
+            pauli_string = ''
+            for j in range(self.n_spin_orb):
+                if first_picked[i][j] == 0:
+                    if first_picked[i][j + ii] == 1:
+                        pauli_string += 'X%d ' % j
+                if first_picked[i][j] == 1:
+                    if first_picked[i][j + ii] == 0:
+                        pauli_string += 'Z%d ' % j
+                    else:
+                        pauli_string += 'Y%d ' % j
+            A = QubitOperator(pauli_string, 0 + 1j)
+            self.fermi_ops.append(A)
+
+        self.n_ops = len(self.fermi_ops)
 
         self.n_ops = len(self.fermi_ops)
         print(" Number of operators: ", self.n_ops)
