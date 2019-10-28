@@ -87,7 +87,7 @@ def adapt_vqe(geometry,
 
     for i in range(pool.n_ops):
         for j in range(pool.n_ops):
-            over_mat[i, j] = vec.transpose().conjugate().dot(pool.spmat_ops[i].dot(pool.spmat_ops[j].dot(vec)))[0,0]
+            over_mat[i, j] = abs(vec.transpose().conjugate().dot(pool.spmat_ops[i].dot(pool.spmat_ops[j].dot(vec)))[0,0])
 
     rank = np.linalg.matrix_rank(over_mat)
 
@@ -311,9 +311,11 @@ def random_Ham(geometry,
                 run_fci=1, 
                 delete_input=1)
     
-    pool.init(molecule)   
+    pool.init(molecule)
 
-    ham = np.random.rand(8, 8)
+    n = pool.n_spin_orb
+
+    ham = np.random.rand(2 ** n, 2 ** n)
     ham_sym = ham + ham.transpose()
     hamiltonian = scipy.sparse.csc_matrix(ham_sym)
     # print(hamiltonian)
@@ -333,8 +335,13 @@ def random_Ham(geometry,
 
     pool.generate_SparseMatrix()
 
-    over_mat = np.zeros(shape=(pool.n_ops, pool.n_ops))
-    vec = np.random.rand(2 ** 3, 1)
+    generated_pool = []
+
+    for op in pool.generated_ops:
+        generated_pool.append(transforms.get_sparse_operator(op, n_qubits=n))
+
+    over_mat = np.zeros(shape=(len(generated_pool), len(generated_pool)))
+    vec = np.random.rand(2 ** n, 1)
     # print(vec)
     norm = 0
 
@@ -344,9 +351,14 @@ def random_Ham(geometry,
     vec = np.true_divide(vec, np.sqrt(norm))
     vec = scipy.sparse.csc_matrix(vec)
 
-    for i in range(pool.n_ops):
-        for j in range(pool.n_ops):
-            over_mat[i, j] = vec.transpose().conjugate().dot(pool.spmat_ops[i].dot(pool.spmat_ops[j].dot(vec)))[0, 0]
+    for i in range(len(pool.generated_ops)):
+        for j in range(len(pool.generated_ops)):
+            element = vec.transpose().conjugate().dot(generated_pool[i].dot(generated_pool[j].dot(vec)))[0, 0]
+            if element.imag == 0:
+                element = element
+            else:
+                element = element.imag
+            over_mat[i, j] = element
 
     rank = np.linalg.matrix_rank(over_mat)
 
@@ -539,7 +551,7 @@ def random_Ham(geometry,
         overlap = overlap*overlap
         # print(" new state ",curr_state)
         print(" Finished: %20.12f" % trial_model.curr_energy)
-        print(" error: %20.12f" % (trial_model.curr_energy-min(w)))
+        print(" error: %20.12f" % (trial_model.curr_energy-min(w).real))
         print(" Overlap: %20.12f" % overlap)
         print(" Variance: %20.12f" % trial_model.variance(parameters))
         print(" -----------New ansatz----------- ")

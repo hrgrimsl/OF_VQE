@@ -238,7 +238,7 @@ class com_gen(OperatorPool):
 
         random.shuffle(self.odd_string)
         first_picked = self.odd_string[:(2 * ii - 2)]
-        picked = first_picked
+        picked = self.odd_string[:(2 * ii - 2)]
         print("initial picked pool size:", len(picked))
 
         pool_vec = np.zeros((4 ** ii,))
@@ -255,7 +255,6 @@ class com_gen(OperatorPool):
                 end = len(picked)
             else:
                 end = length
-
             for i in range(end):
                 for j in range(i+1, len(picked)):
                     Bin = [(picked[i][k] + picked[j][k]) % 2 for k in range(2 * ii)]
@@ -271,6 +270,8 @@ class com_gen(OperatorPool):
 
         print('size of set %12i' % (len(picked)))
 
+        self.generated_ops = []
+
         for i in range(len(picked)):
             pauli_string = ''
             for j in range(ii):
@@ -279,6 +280,20 @@ class com_gen(OperatorPool):
                         pauli_string += 'X%d ' % j
                 if picked[i][j] == 1:
                     if picked[i][j + ii] == 0:
+                        pauli_string += 'Z%d ' % j
+                    else:
+                        pauli_string += 'Y%d ' % j
+            A = QubitOperator(pauli_string, 0+1j)
+            self.generated_ops.append(A)
+
+        for i in range(len(first_picked)):
+            pauli_string = ''
+            for j in range(ii):
+                if first_picked[i][j] == 0:
+                    if first_picked[i][j + ii] == 1:
+                        pauli_string += 'X%d ' % j
+                if first_picked[i][j] == 1:
+                    if first_picked[i][j + ii] == 0:
                         pauli_string += 'Z%d ' % j
                     else:
                         pauli_string += 'Y%d ' % j
