@@ -334,35 +334,6 @@ def random_Ham(geometry,
     Sign = []
 
     pool.generate_SparseMatrix()
-
-    generated_pool = []
-
-    for op in pool.generated_ops:
-        generated_pool.append(transforms.get_sparse_operator(op, n_qubits=n))
-
-    over_mat = np.zeros(shape=(len(generated_pool), len(generated_pool)))
-    vec = np.random.rand(2 ** n, 1)
-    # print(vec)
-    norm = 0
-
-    for i in vec:
-        norm += i * i
-
-    vec = np.true_divide(vec, np.sqrt(norm))
-    vec = scipy.sparse.csc_matrix(vec)
-
-    for i in range(len(pool.generated_ops)):
-        for j in range(len(pool.generated_ops)):
-            element = vec.transpose().conjugate().dot(generated_pool[i].dot(generated_pool[j].dot(vec)))[0, 0]
-            if element.imag == 0:
-                element = element
-            else:
-                element = element.imag
-            over_mat[i, j] = element
-
-    rank = np.linalg.matrix_rank(over_mat)
-
-    print("rank =", rank)
    
     ansatz_ops = []     #SQ operator strings in the ansatz
     ansatz_mat = []     #Sparse Matrices for operators in ansatz
@@ -374,7 +345,7 @@ def random_Ham(geometry,
     ansatz_scal = []
     
     #Build p-h reference and map it to JW transform
-    reference_ket = vec
+    reference_ket = pool.vec
 
     # for n in range(molecule.n_electrons, molecule.n_qubits):
     # 	reference_ket = 1/np.sqrt(2)*(np.exp(1j*0.5)*-1j*pool.spmat_ops[n].dot(reference_ket) + reference_ket)
@@ -404,10 +375,10 @@ def random_Ham(geometry,
 
     Num = QubitOperator('Z1', 0)
 
-    for p in range(0,3):
+    for p in range(0,n):
         Num += QubitOperator('Z%d' %p)
 
-    Num = openfermion.transforms.get_sparse_operator(Num, n_qubits = 3)
+    Num = openfermion.transforms.get_sparse_operator(Num, n_qubits = n)
 
     print(" Now start to grow the ansatz")
     for n_iter in range(0,adapt_maxiter):
@@ -476,6 +447,7 @@ def random_Ham(geometry,
             pickle.dump(ansatz_ops, open('./h4_ansatz.p','wb'))
             print(" Ansatz Growth Converged!")
             print(" Number of operators in ansatz: ", len(ansatz_ops))
+            print("*error: %20.12f" % (trial_model.curr_energy-min(w).real))
             print(" *Finished: %20.12f" % trial_model.curr_energy)
             print(" -----------Final ansatz----------- ")
             print(" %4s %30s %12s" %("Term","Coeff","#"))

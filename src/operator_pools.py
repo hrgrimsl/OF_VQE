@@ -193,7 +193,40 @@ class custom(OperatorPool):
         termA = QubitOperator('Y0 X1', 1j)
         self.fermi_ops.append(termA)
 
+        first_picked = []
+        pool_vec = np.zeros((4 ** self.n_spin_orb,))
+
         for i in self.fermi_ops:
+            for line in i.terms:
+                line = str(line)
+                # print(line)
+                Bin = np.zeros((2 * self.n_spin_orb,), dtype=int)
+                X_pat_1 = re.compile("(\d{,2}), 'X'")
+                X_1 = X_pat_1.findall(line)
+                if X_1:
+                    for i in X_1:
+                        k = int(i)
+                        Bin[self.n_spin_orb + k] = 1
+                Y_pat_1 = re.compile("(\d{,2}), 'Y'")
+                Y_1 = Y_pat_1.findall(line)
+                if Y_1:
+                    for i in Y_1:
+                        k = int(i)
+                        Bin[self.n_spin_orb + k] = 1
+                        Bin[k] = 1
+                Z_pat_1 = re.compile("(\d{,2}), 'Z'")
+                Z_1 = Z_pat_1.findall(line)
+                if Z_1:
+                    for i in Z_1:
+                        k = int(i)
+                        Bin[k] = 1
+                # print(Bin)
+                index = int("".join(str(x) for x in Bin), 2)
+                # print("index", index)
+                first_picked.append(Bin)
+                pool_vec[index] = 1
+
+        for i in first_picked:
             gen_pool.append(i)
 
         # termA = QubitOperator('Z1 Y2', 1j)
@@ -216,64 +249,58 @@ class custom(OperatorPool):
 
         print("initial picked pool size:", len(self.fermi_ops))
 
-        pool_vec = np.zeros((4 ** self.n_spin_orb,))
-
-        for i in picked:
-            index = int("".join(str(x) for x in i), 2)
-            pool_vec[index] = 1
-
         length = 0
 
-        while len(picked) < 4 ** self.n_spin_orb:
+        while len(gen_pool) < 4 ** self.n_spin_orb:
             new = []
             if length == 0:
-                end = len(picked)
+                end = len(gen_pool)
             else:
                 end = length
             for i in range(end):
-                for j in range(i + 1, len(picked)):
-                    Bin = [(picked[i][k] + picked[j][k]) % 2 for k in range(2 * self.n_spin_orb)]
+                for j in range(i + 1, len(gen_pool)):
+                    Bin = [(gen_pool[i][k] + gen_pool[j][k]) % 2 for k in range(2 * self.n_spin_orb)]
                     index = int("".join(str(x) for x in Bin), 2)
                     if pool_vec[index] == 0:
                         new.append(Bin)
                         pool_vec[index] = 1
             length = len(new)
             for i in new:
-                picked.insert(0, i)
+                gen_pool.insert(0, i)
             if length == 0:
                 break
 
-        print('size of set %12i' % (len(picked)))
+        print('size of set %12i' % (len(gen_pool)))
 
         self.generated_ops = []
 
-        for i in range(len(picked)):
+        for i in range(len(gen_pool)):
             pauli_string = ''
             for j in range(self.n_spin_orb):
-                if picked[i][j] == 0:
-                    if picked[i][j + ii] == 1:
+                if gen_pool[i][j] == 0:
+                    if gen_pool[i][j + self.n_spin_orb] == 1:
                         pauli_string += 'X%d ' % j
-                if picked[i][j] == 1:
-                    if picked[i][j + ii] == 0:
+                if gen_pool[i][j] == 1:
+                    if gen_pool[i][j + self.n_spin_orb] == 0:
                         pauli_string += 'Z%d ' % j
                     else:
                         pauli_string += 'Y%d ' % j
             A = QubitOperator(pauli_string, 0 + 1j)
             self.generated_ops.append(A)
 
-        for i in range(len(first_picked)):
-            pauli_string = ''
-            for j in range(self.n_spin_orb):
-                if first_picked[i][j] == 0:
-                    if first_picked[i][j + ii] == 1:
-                        pauli_string += 'X%d ' % j
-                if first_picked[i][j] == 1:
-                    if first_picked[i][j + ii] == 0:
-                        pauli_string += 'Z%d ' % j
-                    else:
-                        pauli_string += 'Y%d ' % j
-            A = QubitOperator(pauli_string, 0 + 1j)
-            self.fermi_ops.append(A)
+        # for i in range(len(first_picked)):
+        #     pauli_string = ''
+        #     for j in range(self.n_spin_orb):
+        #         if first_picked[i][j] == 0:
+        #             if first_picked[i][j + ii] == 1:
+        #                 pauli_string += 'X%d ' % j
+        #         if first_picked[i][j] == 1:
+        #             if first_picked[i][j + ii] == 0:
+        #                 pauli_string += 'Z%d ' % j
+        #             else:
+        #                 pauli_string += 'Y%d ' % j
+        #     A = QubitOperator(pauli_string, 0 + 1j)
+        #     self.fermi_ops.append(A)
 
         self.n_ops = len(self.fermi_ops)
 
@@ -287,7 +314,7 @@ class com_gen(OperatorPool):
         self.bin_pool = []
         self.fermi_ops = []
 
-        ii = 3
+        ii = 5
 
         self.n_spin_orb = ii
 
@@ -303,55 +330,87 @@ class com_gen(OperatorPool):
 
         print("total number of antisymmetric ops :"+str(len(self.odd_string)))
 
-        random.shuffle(self.odd_string)
-        first_picked = self.odd_string[:(2 * ii - 2)]
-        picked = self.odd_string[:(2 * ii - 2)]
+        rank = 0
+
+        while rank < 2 ** ii -1:
+            random.shuffle(self.odd_string)
+            first_picked = self.odd_string[:(2 * ii - 2)]
+            picked = self.odd_string[:(2 * ii - 2)]
+            
+    
+            pool_vec = np.zeros((4 ** ii,))
+    
+            for i in picked:
+                index = int("".join(str(x) for x in i), 2)
+                pool_vec[index] = 1
+    
+            length = 0
+    
+            while len(picked) < 4 ** ii:
+                new = []
+                if length == 0:
+                    end = len(picked)
+                else:
+                    end = length
+                for i in range(end):
+                    for j in range(i+1, len(picked)):
+                        Bin = [(picked[i][k] + picked[j][k]) % 2 for k in range(2 * ii)]
+                        index = int("".join(str(x) for x in Bin), 2)
+                        if pool_vec[index] == 0:
+                            if sum(Bin[k] * Bin[k + ii] for k in range(ii)) % 2 == 1:
+                                new.append(Bin)
+                                pool_vec[index] = 1
+                length = len(new)
+                for i in new:
+                    picked.insert(0, i)
+                if length == 0:
+                    break
+    
+            print('size of set %12i' % (len(picked)))
+    
+            self.generated_ops = []
+    
+            for i in range(len(picked)):
+                pauli_string = ''
+                for j in range(ii):
+                    if picked[i][j] == 0:
+                        if picked[i][j + ii] == 1:
+                            pauli_string += 'X%d ' % j
+                    if picked[i][j] == 1:
+                        if picked[i][j + ii] == 0:
+                            pauli_string += 'Z%d ' % j
+                        else:
+                            pauli_string += 'Y%d ' % j
+                A = QubitOperator(pauli_string, 0+1j)
+                self.generated_ops.append(A)
+
+            generated_pool = []
+    
+            for op in self.generated_ops:
+                generated_pool.append(transforms.get_sparse_operator(op, n_qubits=ii))
+    
+            over_mat = np.zeros(shape=(len(generated_pool), len(generated_pool)))
+            self.vec = np.random.rand(2 ** ii, 1)
+            # print(vec)
+            norm = 0
+        
+            for i in self.vec:
+                norm += i * i
+        
+            self.vec = np.true_divide(self.vec, np.sqrt(norm))
+            self.vec = scipy.sparse.csc_matrix(self.vec)
+        
+            for i in range(len(self.generated_ops)):
+                print(self.generated_ops[i])
+                for j in range(len(self.generated_ops)):
+                    element = self.vec.transpose().conjugate().dot(generated_pool[i].transpose().conjugate().dot(generated_pool[j].dot(self.vec)))[0, 0]
+                    over_mat[i, j] = element.real
+    
+            rank = np.linalg.matrix_rank(over_mat, tol=1e-12)
+
         print("initial picked pool size:", len(picked))
-
-        pool_vec = np.zeros((4 ** ii,))
-
-        for i in picked:
-            index = int("".join(str(x) for x in i), 2)
-            pool_vec[index] = 1
-
-        length = 0
-
-        while len(picked) < 4 ** ii:
-            new = []
-            if length == 0:
-                end = len(picked)
-            else:
-                end = length
-            for i in range(end):
-                for j in range(i+1, len(picked)):
-                    Bin = [(picked[i][k] + picked[j][k]) % 2 for k in range(2 * ii)]
-                    index = int("".join(str(x) for x in Bin), 2)
-                    if pool_vec[index] == 0:
-                        new.append(Bin)
-                        pool_vec[index] = 1
-            length = len(new)
-            for i in new:
-                picked.insert(0, i)
-            if length == 0:
-                break
-
-        print('size of set %12i' % (len(picked)))
-
-        self.generated_ops = []
-
-        for i in range(len(picked)):
-            pauli_string = ''
-            for j in range(ii):
-                if picked[i][j] == 0:
-                    if picked[i][j + ii] == 1:
-                        pauli_string += 'X%d ' % j
-                if picked[i][j] == 1:
-                    if picked[i][j + ii] == 0:
-                        pauli_string += 'Z%d ' % j
-                    else:
-                        pauli_string += 'Y%d ' % j
-            A = QubitOperator(pauli_string, 0+1j)
-            self.generated_ops.append(A)
+    
+        print("rank =", rank)
 
         for i in range(len(first_picked)):
             pauli_string = ''
