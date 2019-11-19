@@ -544,8 +544,8 @@ def q_adapt_vqe(geometry,
         multiplicity    = 1,
         charge          = 0,
         adapt_conver    = 'norm',
-        adapt_thresh    = 1e-6,
-        theta_thresh    = 1e-11,
+        adapt_thresh    = 1e-4,
+        theta_thresh    = 1e-7,
         adapt_maxiter   = 400,
         pool            = operator_pools.qubits(),
         spin_adapt      = True,
@@ -807,6 +807,7 @@ def q_adapt_vqe(geometry,
         overlap = overlap*overlap
         # print(" new state ",curr_state)
         print(" Finished: %20.12f" % trial_model.curr_energy)
+        print(" error: %20.12f" % (trial_model.curr_energy - min(w).real))
         print(" Overlap: %20.12f" % overlap)
         print(" Variance: %20.12f" % trial_model.variance(parameters))
         print(" -----------New ansatz----------- ")
