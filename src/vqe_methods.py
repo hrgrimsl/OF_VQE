@@ -7,9 +7,9 @@ import copy
 import random 
 import sys
 import csv
-import cirq
-import openfermioncirq
-from openfermioncirq import trotter
+# import cirq
+# import openfermioncirq
+# from openfermioncirq import trotter
 import scipy.sparse.linalg
 
 import operator_pools
@@ -17,8 +17,8 @@ import vqe_methods
 from tVQE import *
 import pickle
 
-from  openfermionprojectq  import  uccsd_trotter_engine, TimeEvolution
-from  projectq.backends  import CommandPrinter
+# from  openfermionprojectq  import  uccsd_trotter_engine, TimeEvolution
+# from  projectq.backends  import CommandPrinter
 
 from openfermion import *
 
@@ -226,19 +226,19 @@ def adapt_vqe(geometry,
                 print('Energy step', float(E_step[len(parameters)-k-1]))
                 print("")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = openfermion.transforms.jordan_wigner(1j*s)  # fermionic pool
+                # H = openfermion.transforms.jordan_wigner(1j*s)  # fermionic pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -469,19 +469,19 @@ def random_Ham(geometry,
                 print(" %4s %20f %10s" %(s, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = 1j*s  # Qubits -pool
+                # H = 1j*s  # Qubits -pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -753,19 +753,19 @@ def q_adapt_vqe(geometry,
                 print(" %4s %20f %10s" %(s, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = 1j*s  # Qubits -pool
+                # H = 1j*s  # Qubits -pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -1078,19 +1078,19 @@ def q_adapt_vqe_bk(geometry,
                 print(" %4s %20f %10s" % (s, parameters[si], si))
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine(compiler_backend=CommandPrinter())
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine(compiler_backend=CommandPrinter())
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
 
-                H = 1j * s  # Qubits -pool
+                # H = 1j * s  # Qubits -pool
 
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
 
-                evolution_operator = TimeEvolution(time, H)
+                # evolution_operator = TimeEvolution(time, H)
 
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
 
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -1341,19 +1341,19 @@ def q_adapt_vqe_min(geometry,
                 print(" %4s %20f %10s" %(s, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = 1j*s  # Qubits -pool
+                # H = 1j*s  # Qubits -pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -1623,19 +1623,19 @@ def q_adapt_vqe_sort_mini(geometry,
                 print(" %4s %20f %10s" %(opstring, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = 1j*s  # Qubits -pool
+                # H = 1j*s  # Qubits -pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -1897,19 +1897,19 @@ def q_adapt_vqe_sort(geometry,
                 print(" %4s %20f %10s" %(opstring, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = 1j*s  # Qubits -pool
+                # H = 1j*s  # Qubits -pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -2154,19 +2154,19 @@ def q_adapt_vqe_remove(geometry,
                 print(" %4s %20f %10s" %(opstring, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = 1j*s  # Qubits -pool
+                # H = 1j*s  # Qubits -pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -2395,19 +2395,19 @@ def q_adapt_vqe_sort_rand(geometry,
                 print(" %4s %20f %10s" %(opstring, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = 1j*s  # Qubits -pool
+                # H = 1j*s  # Qubits -pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -2631,19 +2631,19 @@ def q_adapt_vqe_rand(geometry,
                 print(" %4s %20f %10s" %(opstring, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = 1j*s  # Qubits -pool
+                # H = 1j*s  # Qubits -pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -2863,19 +2863,19 @@ def adapt_vqe_trot_same(geometry,
                     print(" %4s %20f %10s" %(tt, parameters[parameters_index[si]], parameters_index[si]) )
                     print(" ")
 
-                    compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                    wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                    # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                    # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
             
-                    H = openfermion.transforms.jordan_wigner(1j*tt)  # fermionic pool
+                    # H = openfermion.transforms.jordan_wigner(1j*tt)  # fermionic pool
             
-                    # Trotter step parameters.
-                    time = parameters[parameters_index[si]]
+                    # # Trotter step parameters.
+                    # time = parameters[parameters_index[si]]
             
-                    evolution_operator = TimeEvolution(time,H)
+                    # evolution_operator = TimeEvolution(time,H)
             
-                    evolution_operator | wavefunction
+                    # evolution_operator | wavefunction
             
-                    compiler_engine.flush()
+                    # compiler_engine.flush()
 
             break
 
@@ -3135,19 +3135,19 @@ def adapt_vqe_trot_same(geometry,
                     print(" %4s %20f %10s" %(tt, parameters[parameters_index[si]], parameters_index[si]) )
                     print(" ")
 
-                    compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                    wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                    # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                    # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
             
-                    H = openfermion.transforms.jordan_wigner(1j*tt)  # fermionic pool
+                    # H = openfermion.transforms.jordan_wigner(1j*tt)  # fermionic pool
             
-                    # Trotter step parameters.
-                    time = parameters[parameters_index[si]]
+                    # # Trotter step parameters.
+                    # time = parameters[parameters_index[si]]
             
-                    evolution_operator = TimeEvolution(time,H)
+                    # evolution_operator = TimeEvolution(time,H)
             
-                    evolution_operator | wavefunction
+                    # evolution_operator | wavefunction
             
-                    compiler_engine.flush()
+                    # compiler_engine.flush()
 
             break
 
@@ -3408,20 +3408,20 @@ def q_adapt_vqe_sup(geometry,
                 print(" %4s %20f %10s" %(opstring, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                H = 1j*s  # Qubits pool
-                # H = openfermion.transforms.jordan_wigner(1j*s)  # fermionic pool
+                # H = 1j*s  # Qubits pool
+                # # H = openfermion.transforms.jordan_wigner(1j*s)  # fermionic pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -3708,21 +3708,21 @@ def q_adapt_vqe_hess(geometry,
                 print(" %4s %20f %10s" %(opstring, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                # H = openfermion.transforms.get_interaction_operator(1j*T)
-                H = 1j*s  # Qubits pool
-                # H = openfermion.transforms.jordan_wigner(1j*s)  # fermionic pool
+                # # H = openfermion.transforms.get_interaction_operator(1j*T)
+                # H = 1j*s  # Qubits pool
+                # # H = openfermion.transforms.jordan_wigner(1j*s)  # fermionic pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
@@ -3949,21 +3949,21 @@ def adapt_vqe_multiselect(geometry,
                 print(" %4s %20f %10s" %(opstring, parameters[si], si) )
                 print(" ")
 
-                compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
-                wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
+                # compiler_engine = uccsd_trotter_engine( compiler_backend=CommandPrinter() )
+                # wavefunction = compiler_engine.allocate_qureg(molecule.n_qubits)
         
-                # H = openfermion.transforms.get_interaction_operator(1j*T)
-                H = 1j*s  # Qubits pool
-                # H = openfermion.transforms.jordan_wigner(1j*s)  # fermionic pool
+                # # H = openfermion.transforms.get_interaction_operator(1j*T)
+                # H = 1j*s  # Qubits pool
+                # # H = openfermion.transforms.jordan_wigner(1j*s)  # fermionic pool
         
-                # Trotter step parameters.
-                time = parameters[si]
+                # # Trotter step parameters.
+                # time = parameters[si]
         
-                evolution_operator = TimeEvolution(time,H)
+                # evolution_operator = TimeEvolution(time,H)
         
-                evolution_operator | wavefunction
+                # evolution_operator | wavefunction
         
-                compiler_engine.flush()
+                # compiler_engine.flush()
 
             break
 
