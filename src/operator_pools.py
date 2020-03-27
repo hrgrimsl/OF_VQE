@@ -23,13 +23,13 @@ class OperatorPool:
     def init(self,molecule):
 
         self.n_orb = molecule.n_orbitals
-        print(self.n_orb)
-        print(molecule.n_electrons)
+        # print(self.n_orb)
+        # print(molecule.n_electrons)
         self.n_spin_orb = 2*self.n_orb 
         self.n_occ_a = molecule.get_n_alpha_electrons()
-        print(self.n_occ_a)
+        # print(self.n_occ_a)
         self.n_occ_b = molecule.get_n_beta_electrons()
-        print(self.n_occ_b)
+        # print(self.n_occ_b)
     
         self.n_vir_a = self.n_orb - self.n_occ_a
         self.n_vir_b = self.n_orb - self.n_occ_b
