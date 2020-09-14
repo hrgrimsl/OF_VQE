@@ -12,9 +12,9 @@ vqe_methods.adapt_vqe(geometry,
                       rand_ham        = False,                     #random hamiltonian
                       mapping         = 'jw',                      #mapping, jw or bk
                       n               = 2,                         #number of qubits, only used when rand_ham == True
-                      pool            = operator_pools.long_2(),       #choice of pool
+                      pool            = operator_pools.singlet_GSD(),       #choice of pool
                       random_prod     = False,                     #random product initial state or not
                       sec_deriv       = False,                     #use second derivative and single parameter vqe to select ops 
                       analy_grad      = True,                      #use analytic gradient for BFGS 
                       init_para       = 1,
-                      rand_Z          = True)                         #initial value of theta for single parameter vqe
+                      rand_Z          = False)                         #initial value of theta for single parameter vqe
